@@ -67,6 +67,14 @@ def read_patients_table(mimic_iii_path):
 
     return df
 
+def read_noteevents_table(mimic_iii_path):
+    df = pd.read_csv(os.path.join(mimic_iii_path, 'NOTEEVENTS.csv'))
+
+    # Only keep relevant columns
+    df = df[['SUBJECT_ID', 'HADM_ID', 'CHARTDATE', 'CHARTTIME', 'CATEGORY',
+        'DESCRIPTION', 'ISERROR', 'TEXT']]
+
+    return df
 
 def filter_on_first_admission(df):
     df_first_admin = df[['SUBJECT_ID', 'INTIME']].groupby(
@@ -74,3 +82,4 @@ def filter_on_first_admission(df):
     df = df[df['INTIME'].isin(df_first_admin['INTIME'])]
 
     return df
+

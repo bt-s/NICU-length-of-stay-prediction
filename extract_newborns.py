@@ -58,6 +58,16 @@ def main(args):
     if verbose:
         print(f'Extracted first complete neonatal ICU admissions: {len(df)}')
 
+    if verbose: print('Reading NOTEEVENTS table...')
+    df_notes = read_noteevents_table(mimic_iii_path)
+
+    # Filter df_notes on subjects and admissions in df
+    df_notes = df_notes[df_notes['SUBJECT_ID'].isin(df['SUBJECT_ID'])]
+    df_notes = df_notes[df_notes['HADM_ID'].isin(df['HADM_ID'])]
+
+    # Filter on subjects that have notes associated with them
+    df = df[df['SUBJECT_ID'].isin(df_notes['SUBJECT_ID'])]
+
     if verbose:
         print(f'Total admissions identified: {tot_admit}\n' \
                 f'Newborn admissions identified: {nb_admit}\n' \
