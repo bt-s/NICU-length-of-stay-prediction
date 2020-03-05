@@ -12,14 +12,21 @@ import re
 
 
 # Regular expression to capture the gestational age of a patient
-re_ga = re.compile('(\d{2}( +and +| +- +|-| +)?(\[\*\*\d{1,2}-\d{1,2}\*\*\]' +
-        '|\d|/|\.)[\/|-]?\d?(th|ths)?(-?| +)(wk|week)?s?(,|-|\’)? *(est.?|' +
-        'estimated)? *(gestation|ga |g\.a\.|ga\.))|(\d{2}((\.|\/|-)\d{1})?' +
+re_ga = re.compile('(\d{2}|(twenty|thirty|forty)(-| |)?(one|two|three|four|' +
+        'five|six|seven|eight|nine)?)( +and +| +- +|-| +)? *(\[\*\*\d{1,2}-' +
+        '\d{1,2}\*\*\]|\d|/|\.)?[\/|-]?\d?(th|ths)?(-? *| +)(wk|week)s? *' +
+        '(infant|\[\*\*name)|((\d{2}|(twenty|thirty|forty)(-| |)?(one|two|' +
+        'three|four|five|six|seven|eight|nine)?)( +and +| +- +|-| +)? *' +
+        '(\[\*\*\d{1,2}-\d{1,2}\*\*\]|\d|/|\.)?[\/|-]?\d?(th|ths)?(-? *| +)' +
+        '(wk|week)?s?(,|-|\’)? *(est.?|estimated)? *(triplet|twin|\d{4} gram|' +
+        '(fe)?male|newborn(?! meds given) |premature|gestation|ga(?!uge)' +
+        '(?! spinal needle)(?!stro)|g\.a\.|ga\.))|(\d{2}((\.|\/|-)\d{1})?' +
         '[ +|-](week|wk)(s)? +(gestation|ga |g.a.|ga))|((former|ex|' +
-        'product of a|delivered at|born at)( +|-)\d{2}\+?-? *(\d/\d|\d-\d|\d)' +
-        '?-? *(week|wk)s? *-?(gestation|ga |g\.a\.|ga\.)?|((prematurity at|' +
-        '(estimated|est|est.) *(gestation(al)? age|ga|g\.a\.|ga) *of) *\d{2} +' +
-        '(\d/\d)? *(week|wk)))')
+        'product of a|delivered at|born at|in labor at|gestation at|' +
+        'gestational age (of|is))( +|-)\d{2}\+?( +and +|-)? *(\[\*\*\d{1,2}' +
+        '-\d{1,2}\*\*\]|\d/\d|\d-\d|\d)?(th|ths)?-? *(week|wk)s? *-?(' +
+        'gestation|ga |g\.a\.|ga\.)?|((prematurity at|(estimated|est|est.)' +
+        '*(gestation(al)? age|ga|g\.a\.|ga) *of) *\d{2} +(\d/\d)? *(week|wk)))')
 
 # Regular expression to capture the corrected gestational age of a patient
 re_cga = re.compile('d(ol|ay|ay of life|ays old) *#? *(\d{1,2} *(,|/)? ' +
@@ -33,7 +40,7 @@ re_dd = re.compile('\d{2}')
 re_dol = re.compile('\d+')
 
 # Regex to capture anonymized gestational age strings and digit_digit+
-re_anon_dd_p = re.compile('\[\*\*|\d{2}\+')
+re_anon_dd_p = re.compile('\[\*\*\d|\d{2}\+')
 
 # Regex to capture digit/digit
 re_d_d_slash = re.compile('\d{1}/\d{1}')
@@ -49,6 +56,7 @@ re_splitter = re.compile('(pma|ca|cga|now)')
 
 # Dictionary containing all regular expressions
 reg_exps = {'re_ga': re_ga, 're_cga': re_cga, 're_dd': re_dd, 're_dol': re_dol,
-        're_anon_dd_p': re_anon_dd_p, 're_d_d_slash': re_d_d_slash, 're_d_d_dash': re_d_d_dash, 're_dd_d': re_dd_d,
+        're_anon_dd_p': re_anon_dd_p, 're_d_d_slash': re_d_d_slash,
+        're_d_d_dash': re_d_d_dash, 're_dd_d': re_dd_d,
         're_splitter': re_splitter}
 
