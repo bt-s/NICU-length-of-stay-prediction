@@ -12,6 +12,8 @@ import pandas as pd
 import numpy as np
 import os
 
+from word2number import w2n
+
 
 def read_icustays_table(mimic_iii_path):
     df = pd.read_csv(os.path.join(mimic_iii_path, 'ICUSTAYS.csv'))
@@ -144,7 +146,10 @@ def extract_from_ga_match(match_ga, reg_exps, verbose=0):
         days_ga = 0
 
     # Extract weeks from match
-    weeks_ga = int(reg_exps['re_dd'].findall(match_str_ga)[0])
+    try:
+        weeks_ga = w2n.word_to_num(match_str_ga)
+    except ValueError:
+        weeks_ga = int(reg_exps['re_dd'].findall(match_str_ga)[0])
 
     # Calculate days GA
     days_ga += weeks_ga*7
