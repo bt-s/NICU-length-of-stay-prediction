@@ -30,37 +30,33 @@ def parse_cl_args():
 
 
 def main(args):
-    try:
-        os.makedirs(args.output_path)
-    except:
-        pass
-
     verbose, mimic_iii_path  = args.verbose, args.input_path
 
-    if verbose: print('Reading ICUSTAYS table...')
-    df, tot_icu_admit, tot_nicu_admit = read_icustays_table(mimic_iii_path)
+    # Read the ICUSTAYS table
+    df, tot_icu_admit, tot_nicu_admit = read_icustays_table(mimic_iii_path,
+            verbose)
 
-    if verbose: print('Reading ADMISSIONS table...')
-    df_admit, tot_admit, nb_admit = read_admissions_table(mimic_iii_path)
+    # Read the ADMISSIONS table
+    df_admit, tot_admit, nb_admit = read_admissions_table(mimic_iii_path,
+            verbose)
 
-    # Merge admission information into dataframe
+    if verbose: print('Merge admission information into dataframe...')
     df = df.merge(df_admit, how='inner', on=['SUBJECT_ID', 'HADM_ID'])
 
-    print('Reading PATIENTS table...')
-    df_pat = read_patients_table(mimic_iii_path)
+    # Read the PATIENTS table
+    df_pat = read_patients_table(mimic_iii_path, verbose)
 
-    # Merge patients information into dataframe
+    if verbose: print('Merge patients information into dataframe...')
     df = df.merge(df_pat, how='inner', on='SUBJECT_ID')
 
-    # Only keep the first admission for each patient
-    if verbose: print("Removing all but the first admission for each patient...")
+    if verbose: print("Remove all but the first admission for each patient...")
     df = filter_on_first_admission(df)
 
     if verbose:
         print(f'Extracted first complete neonatal ICU admissions: {len(df)}')
 
-    if verbose: print('Reading NOTEEVENTS table...')
-    df_notes = read_noteevents_table(mimic_iii_path)
+    # Read the NOTEEVENTS table
+    df_notes = read_noteevents_table(mimic_iii_path, verbose)
 
     # Filter df_notes on subjects and admissions in df
     df_notes = df_notes[df_notes['SUBJECT_ID'].isin(df['SUBJECT_ID'])]
@@ -76,7 +72,7 @@ def main(args):
                 f'Neonatal ICU admissions identified: {tot_nicu_admit}\n' \
                 f'Total first complete neonatal ICU admissions: {len(df)}')
 
-    if verbose: print('Extracting GA from notes...')
+    if verbose: print('Extract GA from notes...')
     # Create a temporary dataframe to capture the GA from df_notes
     df_ga = pd.DataFrame(columns=['SUBJECT_ID', 'GA_MATCH', 'GA_DAYS',
         'GA_WEEKS_ROUND'])
@@ -91,11 +87,11 @@ def main(args):
             df_ga.loc[ix] = [row.SUBJECT_ID] + [m] + [d] + [w]
     if verbose: print(f'Total GAs identified: {len(gest_age_set)}')
 
-    # Merge df_ga into df
+    if verbose: print('Merge GA information into dataframe...')
     df = df.merge(df_ga, how='inner', on='SUBJECT_ID')
 
-    with open('subjects.txt', 'w') as f:
-        f.write(str(df['SUBJECT_ID'].to_list()))
+    if verbose: print('Pickle dataframe...')
+    df.to_pickle(args.output_path)
 
 
 if __name__ == '__main__':

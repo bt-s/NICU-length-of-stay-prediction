@@ -16,41 +16,54 @@ import re
 from word2number import w2n
 
 
-def read_icustays_table(mimic_iii_path):
+def read_icustays_table(mimic_iii_path, verbose=0):
+    if verbose: print('Read ICUSTAYS table...')
     df = pd.read_csv(os.path.join(mimic_iii_path, 'ICUSTAYS.csv'))
     tot_icu_admit = len(df)
 
-    # Keep neonatal ICU admissions
-    df = df[df.FIRST_CAREUNIT == 'NICU']
-    tot_nicu_admit = len(df)
-
-    # Make sure that the time fields are datatime
+    if verbose: print('Make sure that the time fields are datetime...')
     df.INTIME = pd.to_datetime(df.INTIME)
-    df.OUTTIME = pd.to_datetime(df.OUTTIME)
 
-    # Only keep neonatal ICU stays without transfers
+    if verbose: print('Only keep NICU stays without transfers...')
+    df = df[df.FIRST_CAREUNIT == 'NICU']
+
     df = df.loc[(df.FIRST_WARDID == df.LAST_WARDID) &
             (df.FIRST_CAREUNIT == df.LAST_CAREUNIT)]
 
+    tot_nicu_admit = len(df)
+
+    if verbose: print('Remove admissions with undefined LOS...')
+    df = df[df.LOS.isnull() == False]
+
+    if verbose: print('Remove admissions with undefined LOS...')
+    df = df[df.LOS.isnull() == False]
+
+    if verbose: print('Create rounded LOS_HOURS variable...')
+    df['LOS_HOURS'] = round(df['LOS']*24, 0).astype('int')
+
     # Only keep relevant columns
-    df[['SUBJECT_ID', 'HADM_ID', 'ICUSTAY_ID', 'LAST_CAREUNIT',
-        'DBSOURCE', 'INTIME', 'OUTTIME', 'LOS']]
+    df = df[['SUBJECT_ID', 'HADM_ID', 'ICUSTAY_ID', 'INTIME', 'OUTTIME', 'LOS',
+        'LOS_HOURS', 'FIRST_CAREUNIT', 'LAST_CAREUNIT', 'FIRST_WARDID',
+        'LAST_WARDID']]
 
     return df, tot_icu_admit, tot_nicu_admit
 
 
-def read_admissions_table(mimic_iii_path):
+def read_admissions_table(mimic_iii_path, verbose=0):
+    if verbose: print('Read ADMISSIONS table...')
     df = pd.read_csv(os.path.join(mimic_iii_path, 'ADMISSIONS.csv'))
     tot_admit = len(df)
 
-    # Keep newborns
+    if verbose: print('Only keep admissions of type NEWBORN...')
     df = df[df.ADMISSION_TYPE == 'NEWBORN']
     nb_admit = len(df)
 
+    if verbose: print('Remove stays without chart events...')
+    df = df[df.HAS_CHARTEVENTS_DATA == 1]
+
     # Keep relevant columns
-    df = df[['ROW_ID', 'SUBJECT_ID', 'HADM_ID', 'ADMITTIME',
-        'DISCHTIME', 'DEATHTIME', 'HOSPITAL_EXPIRE_FLAG',
-        'HAS_CHARTEVENTS_DATA']]
+    df = df[['SUBJECT_ID', 'HADM_ID', 'ADMITTIME', 'DISCHTIME', 'DEATHTIME',
+        'HOSPITAL_EXPIRE_FLAG']]
 
     # Make sure that the time fields are datatime
     df.ADMITTIME = pd.to_datetime(df.ADMITTIME)
@@ -60,7 +73,8 @@ def read_admissions_table(mimic_iii_path):
     return df, tot_admit, nb_admit
 
 
-def read_patients_table(mimic_iii_path):
+def read_patients_table(mimic_iii_path, verbose=0):
+    if verbose: print('Read PATIENTS table...')
     df = pd.read_csv(os.path.join(mimic_iii_path, 'PATIENTS.csv'))
 
     # Only keep relevant columns
@@ -73,7 +87,8 @@ def read_patients_table(mimic_iii_path):
     return df
 
 
-def read_noteevents_table(mimic_iii_path):
+def read_noteevents_table(mimic_iii_path, verbose=0):
+    if verbose: print('Read NOTEEVENTS table...')
     df = pd.read_csv(os.path.join(mimic_iii_path, 'NOTEEVENTS.csv'))
 
     # Only keep relevant columns
@@ -97,6 +112,7 @@ def extract_from_cga_match(match_str_cga, reg_exps):
     match_str = reg_exps['re_splitter'].split(match_str_cga)
     match_str_dol = match_str[0]
     match_str_cga = match_str[2]
+
     # Extract the days of life
     dol = int(reg_exps['re_dol'].search(match_str_dol).group(0))
 
