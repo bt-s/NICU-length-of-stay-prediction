@@ -182,7 +182,7 @@ def extract_gest_age(s, reg_exps, verbose=0):
             max_weeks_ga_round = weeks_ga_round
             max_days_ga = days_ga
         else:
-            match = None
+            match_str = None
     else:
         # See if matches can be found with the gestational age regex
         matches = reg_exps['re_ga'].findall(s)
@@ -192,7 +192,8 @@ def extract_gest_age(s, reg_exps, verbose=0):
             for m in range(len(matches)):
                 days_ga, weeks_ga_round = extract_from_ga_match(
                         matches[m][0], reg_exps)
-                if (weeks_ga_round > max_weeks_ga_round) and (23 < weeks_ga_round < 43):
+                if ((weeks_ga_round > max_weeks_ga_round) and
+                        (23 < weeks_ga_round < 43)):
                     max_weeks_ga_round = weeks_ga_round
                     max_days_ga = days_ga
                     match_str = matches[m][0]
