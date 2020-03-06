@@ -12,6 +12,7 @@ import argparse
 from sys import argv
 
 from utils import *
+from reg_exps import reg_exps
 
 
 def parse_cl_args():
@@ -74,6 +75,28 @@ def main(args):
                 f'Total ICU admissions identified: {tot_icu_admit}\n' \
                 f'Neonatal ICU admissions identified: {tot_nicu_admit}\n' \
                 f'Total first complete neonatal ICU admissions: {len(df)}')
+
+    if verbose: print('Extracting GA from notes...')
+    # Create a temporary dataframe to capture the GA from df_notes
+    df_ga = pd.DataFrame(columns=['SUBJECT_ID', 'GA_MATCH', 'GA_DAYS',
+        'GA_WEEKS_ROUND'])
+
+    gest_age_set = set()
+    for ix, row in df_notes.iterrows():
+        m = None # Default is that no match will be found
+        if row.SUBJECT_ID not in gest_age_set:
+            m, d, w = extract_gest_age(row.TEXT, reg_exps)
+        if m:
+            gest_age_set.add(row.SUBJECT_ID)
+            df_ga.loc[ix] = [row.SUBJECT_ID] + [m] + [d] + [w]
+    if verbose: print(f'Total GAs identified: {len(gest_age_set)}')
+
+    # Merge df_ga into df
+    df = df.merge(df_ga, how='inner', on='SUBJECT_ID')
+
+    with open('subjects.txt', 'w') as f:
+        f.write(str(df['SUBJECT_ID'].to_list()))
+
 
 if __name__ == '__main__':
     main(parse_cl_args())
