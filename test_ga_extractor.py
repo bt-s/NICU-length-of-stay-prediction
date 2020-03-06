@@ -13,6 +13,16 @@ error_strings = [
     '22 ga spinal needle',
     '22 gauge',
     '64. newborn meds given',
+    '20. newborn screen has been sent',
+    '72. newborn state screen',
+    'BM 24 gavage',
+    '24, gavaged over',
+    '20, gaining weight',
+    '30, gaggy \w initial',
+    '2455 male, SGA',
+    '22 weeks gestational age',
+    '43 weeks gestational age',
+    '3495 female'
 ]
 
 
@@ -311,6 +321,31 @@ class TestGAExtractor(unittest.TestCase):
 
         m, d, w = extract_gest_age('in labor at 34-6/7 weeks', reg_exps)
         self.assertEqual([d, w], [244, 35])
+
+        m, d, w = extract_gest_age(
+                'spotting at 22 weeks GA, born at 39 and 0/7 weeks gestation',
+                reg_exps)
+        self.assertEqual([d, w], [273, 39])
+
+        m, d, w = extract_gest_age(
+                'born at 39 and 0/7 weeks gestation, spotting at 22 weeks GA',
+                reg_exps)
+        self.assertEqual([d, w], [273, 39])
+
+
+        m, d, w = extract_gest_age(
+                'at 33-5/7 weeks GA, at 33-5/78 weeks gestational age',
+                reg_exps)
+        self.assertEqual([d, w], [236, 34])
+
+        m, d, w = extract_gest_age('31 and [**3-25**] week baby girl', reg_exps)
+        self.assertTrue(217 <= d <= 223)
+        self.assertTrue(w == 31 or w == 32)
+
+        m, d, w = extract_gest_age(
+                '30 6/7 weeks gestation, Born at less than 32 weeks gestation;',
+                reg_exps)
+        self.assertEqual([d, w], [216, 31])
 
 
 if __name__ == '__main__':
