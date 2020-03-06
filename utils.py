@@ -91,10 +91,7 @@ def filter_on_first_admission(df):
     return df
 
 
-def extract_from_cga_match(match_cga, reg_exps):
-    # Extract matched string
-    match_str_cga = match_cga.group(0)
-
+def extract_from_cga_match(match_str_cga, reg_exps):
     # Split the match of the CGA to be able to compute the number of days
     # and weeks
     match_str = reg_exps['re_splitter'].split(match_str_cga)
@@ -130,7 +127,8 @@ def extract_from_cga_match(match_cga, reg_exps):
 
 def extract_from_ga_match(match_ga, reg_exps, verbose=0):
     # Extract matched string
-    match_str_ga = match_ga.group(0)
+    #match_str_ga = match_ga.group(0)
+    match_str_ga = match_ga
 
     # Extract the days part of the gestational age
     if reg_exps['re_dd_d'].findall(match_str_ga):
@@ -162,7 +160,9 @@ def extract_from_ga_match(match_ga, reg_exps, verbose=0):
 
 
 def extract_gest_age(s, reg_exps, verbose=0):
-    match, days_ga, weeks_ga_round = None, 0 ,0
+    # We want to find the maximum reported value in the clinical note
+    match_str, max_days_ga, max_weeks_ga_round = None, 0, 0
+
     # Reformat string to lowercase without new line characters
     s = s.replace('\n', ' ').lower()
 
@@ -170,20 +170,34 @@ def extract_gest_age(s, reg_exps, verbose=0):
     s = re.sub(reg_exps['re_false'], '', s)
 
     # See if a match can be found with the corrected gestational age regex
+    # Assumption: if mentioned, the CGA is only mentioned once
     match = reg_exps['re_cga'].search(s)
 
     if match:
-        days_ga, weeks_ga_round = extract_from_cga_match(match,
+        # Extract string from match
+        match_str = match.group(0)
+        days_ga, weeks_ga_round = extract_from_cga_match(match_str,
                 reg_exps)
+        if (23 < weeks_ga_round < 43):
+            max_weeks_ga_round = weeks_ga_round
+            max_days_ga = days_ga
+        else:
+            match = None
     else:
-        # See if a match can be found with the gestational age regex
-        match = reg_exps['re_ga'].search(s)
+        # See if matches can be found with the gestational age regex
+        matches = reg_exps['re_ga'].findall(s)
 
-        if match:
-            days_ga, weeks_ga_round = extract_from_ga_match(
-                    match, reg_exps)
+        if len(matches) != 0:
+            # Extract the match with the highest gestational age
+            for m in range(len(matches)):
+                days_ga, weeks_ga_round = extract_from_ga_match(
+                        matches[m][0], reg_exps)
+                if (weeks_ga_round > max_weeks_ga_round) and (23 < weeks_ga_round < 43):
+                    max_weeks_ga_round = weeks_ga_round
+                    max_days_ga = days_ga
+                    match_str = matches[m][0]
         else:
             if verbose: print(f'The GA cannot be extracted from: {s}')
 
-    return match, days_ga, weeks_ga_round
+    return match_str, max_days_ga, max_weeks_ga_round
 
