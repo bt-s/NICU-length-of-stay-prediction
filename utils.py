@@ -11,6 +11,7 @@ __author__ = "Bas Straathof"
 import pandas as pd
 import numpy as np
 import os
+import re
 
 from word2number import w2n
 
@@ -164,6 +165,9 @@ def extract_gest_age(s, reg_exps, verbose=0):
     match, days_ga, weeks_ga_round = None, 0 ,0
     # Reformat string to lowercase without new line characters
     s = s.replace('\n', ' ').lower()
+
+    # Filter out false string that occurs in many notes
+    s = re.sub(reg_exps['re_false'], '', s)
 
     # See if a match can be found with the corrected gestational age regex
     match = reg_exps['re_cga'].search(s)
