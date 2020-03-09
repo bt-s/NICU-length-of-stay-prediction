@@ -218,3 +218,16 @@ def extract_gest_age(s, reg_exps, verbose=0):
 
     return match_str, max_days_ga, max_weeks_ga_round
 
+
+def transfer_filter(s, reg_exps, verbose=0):
+    # Default: no match is found
+    match = None
+
+    # Reformat string to lowercase without new line characters
+    s = s.replace('\n', ' ').lower()
+
+    # See if a match can be found with the unpredictable transfer filter regex
+    match = reg_exps['re_trans_filter'].search(s)
+
+    return match
+

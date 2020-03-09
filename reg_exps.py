@@ -55,9 +55,21 @@ re_false = re.compile('(born at less than 32 weeks gestation|\d{4} (fe)?male)')
 # Regex to split a corrected gestational age regex match string
 re_splitter = re.compile('(pma|ca|cga|now)')
 
+re_trans_filter = re.compile(
+        '(discharge (diagnosis|disposition): +(transfer(red)? )?(to)?' +
+        '((( a)? *level *(iii|3|three),? *(\[\*\* *hospital *\d* *\d+ ' +
+        '*\*\*\]|(neonatal|newborn) intensive care unit|nicu|nursery|facility' +
+        '|due to a lack of available beds))| +\[\*\* *hospital *\d* *\d+ ' +
+        '*\*\*\],? +(level (iii|3|three))? *(nicu|(newborn|neonatal) ' +
+        'intensive care unit)| level (iii|3|three))|(due to|because of' +
+        '|for) *(bed unavailability|(the )?lack of (bed( availability|s at' +
+        '| space)|available bed))|transfer(red)? to \[\*\* *hospital *\d* ' +
+        '*\d+ *\*\*\] +((due to|because of|for) * census reasons|nicu|' +
+        '(neonatal|newborn) intensive care unit))')
+
 # Dictionary containing all regular expressions
 reg_exps = {'re_ga': re_ga, 're_cga': re_cga, 're_dd': re_dd, 're_dol': re_dol,
         're_anon_dd_p': re_anon_dd_p, 're_d_d_slash': re_d_d_slash,
         're_d_d_dash': re_d_d_dash, 're_dd_d': re_dd_d, 're_false': re_false,
-        're_splitter': re_splitter}
+        're_splitter': re_splitter, 're_trans_filter': re_trans_filter}
 
