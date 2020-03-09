@@ -36,6 +36,9 @@ def main(args):
     df, tot_icu_admit, tot_nicu_admit = read_icustays_table(mimic_iii_path,
             verbose)
 
+    if verbose: print('Remove admission shorter than four hours...')
+    df = df[df.LOS >= 1/6]
+
     # Read the ADMISSIONS table
     df_admit, tot_admit, nb_admit = read_admissions_table(mimic_iii_path,
             verbose)
@@ -65,30 +68,48 @@ def main(args):
     # Filter on subjects that have notes associated with them
     df = df[df['SUBJECT_ID'].isin(df_notes['SUBJECT_ID'])]
 
-    if verbose:
-        print(f'Total admissions identified: {tot_admit}\n' \
-                f'Newborn admissions identified: {nb_admit}\n' \
-                f'Total ICU admissions identified: {tot_icu_admit}\n' \
-                f'Neonatal ICU admissions identified: {tot_nicu_admit}\n' \
-                f'Total first complete neonatal ICU admissions: {len(df)}')
-
-    if verbose: print('Extract GA from notes...')
+    if verbose: print('Extract GA from notes and remove admissions with a ' +
+            'capacity related transfer...')
     # Create a temporary dataframe to capture the GA from df_notes
     df_ga = pd.DataFrame(columns=['SUBJECT_ID', 'GA_MATCH', 'GA_DAYS',
         'GA_WEEKS_ROUND'])
 
-    gest_age_set = set()
+    gest_age_set, cap_trans_set = set(), set()
     for ix, row in df_notes.iterrows():
-        m = None # Default is that no match will be found
+        m_ga, m_ct = None, None # Default is that no match will be found
+        # Look for GA
         if row.SUBJECT_ID not in gest_age_set:
-            m, d, w = extract_gest_age(row.TEXT, reg_exps)
-        if m:
+            m_ga, d, w = extract_gest_age(row.TEXT, reg_exps)
+        if m_ga:
             gest_age_set.add(row.SUBJECT_ID)
-            df_ga.loc[ix] = [row.SUBJECT_ID] + [m] + [d] + [w]
-    if verbose: print(f'Total GAs identified: {len(gest_age_set)}')
+            df_ga.loc[ix] = [row.SUBJECT_ID] + [m_ga] + [d] + [w]
+
+        # Look for capacity-related transfers
+        if row.SUBJECT_ID not in cap_trans_set:
+            m_ct = transfer_filter(row.TEXT, reg_exps)
+        if m_ct:
+            cap_trans_set.add(row.SUBJECT_ID)
+
+    if verbose: print(f'Total GAs identified: {len(gest_age_set)}\n' +
+            'Total capacity-related admissions identified: ' +
+            f'{len(cap_trans_set)}')
 
     if verbose: print('Merge GA information into dataframe...')
     df = df.merge(df_ga, how='inner', on='SUBJECT_ID')
+    tot_nicu_admit_w_ga = len(df)
+
+    if verbose: print('Filter out admissions with capacity-related ' +
+            'transfers...')
+    df = df[~df['SUBJECT_ID'].isin(cap_trans_set)]
+
+    if verbose:
+        print(f'Total admissions identified: {tot_admit}\n' \
+              f'Newborn admissions identified: {nb_admit}\n' \
+              f'Total ICU admissions identified: {tot_icu_admit}\n' \
+              f'Neonatal ICU admissions identified: {tot_nicu_admit}\n' \
+              f'NICU admissions with gestational age: {tot_nicu_admit_w_ga}\n' \
+              f'Total NICU admissions with capacity-related transfers ' \
+              f'removed: {len(df)}')
 
     if verbose: print('Pickle dataframe...')
     df.to_pickle(args.output_path)
