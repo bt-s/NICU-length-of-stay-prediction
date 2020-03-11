@@ -120,6 +120,14 @@ def filter_on_first_admission(df):
     return df
 
 
+def filter_on_newborns(df):
+    df['AGE'] = (df['ADMITTIME'] - df['DOB']).dt.days
+    df = df[df['AGE'] == 0]
+    df = df.drop(['AGE'], axis=1)
+
+    return df
+
+
 def extract_from_cga_match(match_str_cga, reg_exps):
     # Split the match of the CGA to be able to compute the number of days
     # and weeks
