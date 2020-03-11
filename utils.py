@@ -101,6 +101,17 @@ def read_noteevents_table(mimic_iii_path, verbose=0):
     return df
 
 
+def read_labevents_table(mimic_iii_path, verbose=0):
+    if verbose: print('Read LABEVENTS table...')
+    df = pd.read_csv(mimic_iii_path + 'LABEVENTS.csv')
+
+    # Only keep relevant columns
+    df = df[['SUBJECT_ID', 'HADM_ID', 'ITEMID', 'CHARTTIME', 'VALUE',
+        'VALUENUM', 'VALUEUOM', 'FLAG']]
+
+    return df
+
+
 def filter_on_first_admission(df):
     df_first_admin = df[['SUBJECT_ID', 'INTIME']].groupby(
             'SUBJECT_ID').min().reset_index()
