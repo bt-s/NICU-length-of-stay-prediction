@@ -22,7 +22,8 @@ error_strings = [
     '2455 male, SGA',
     '22 weeks gestational age',
     '43 weeks gestational age',
-    '3495 female'
+    '3495 female',
+    '32 and 35 weeks gestation'
 ]
 
 
