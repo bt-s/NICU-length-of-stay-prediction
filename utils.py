@@ -253,3 +253,35 @@ def transfer_filter(s, reg_exps, verbose=0):
 
     return match
 
+
+def set_targets(df):
+    """The targets exist of ten buckets:
+        0: less than 1 day; 1: 1 day; 2: 2 day; 3: 3 day; 4: 4 day;
+        5: 5 day; 6: 6 day; 7: 7 day; 8: 8-13 days; 9: more than 14 days
+    """
+    # Initialize the target column
+    df['TARGET'] = 0
+    for ix, row in df.iterrows():
+        if row.LOS < 1:
+            df.at[ix,'TARGET'] = 0
+        elif 1 <= row.LOS < 2:
+            df.at[ix,'TARGET'] = 1
+        elif 2 <= row.LOS < 3:
+            df.at[ix,'TARGET'] = 2
+        elif 3 <= row.LOS < 4:
+            df.at[ix,'TARGET'] = 3
+        elif 4 <= row.LOS < 5:
+            df.at[ix,'TARGET'] = 4
+        elif 5 <= row.LOS < 6:
+            df.at[ix,'TARGET'] = 5
+        elif 6 <= row.LOS < 7:
+            df.at[ix,'TARGET'] = 6
+        elif 7 <= row.LOS < 8:
+            df.at[ix,'TARGET'] = 7
+        elif 8 <= row.LOS < 14:
+            df.at[ix,'TARGET'] = 8
+        elif 14 <= row.LOS:
+            df.at[ix,'TARGET'] = 9
+
+    return df
+
