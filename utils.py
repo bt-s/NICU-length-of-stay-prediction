@@ -163,9 +163,8 @@ def extract_from_cga_match(match_str_cga, reg_exps):
     return days_ga, weeks_ga_round
 
 
-def extract_from_ga_match(match_ga, reg_exps, verbose=0):
+def extract_from_ga_match(match_ga, reg_exps):
     # Extract matched string
-    #match_str_ga = match_ga.group(0)
     match_str_ga = match_ga
 
     # Extract the days part of the gestational age
@@ -214,11 +213,15 @@ def extract_gest_age(s, reg_exps, verbose=0):
     if match:
         # Extract string from match
         match_str = match.group(0)
-        days_ga, weeks_ga_round = extract_from_cga_match(match_str,
-                reg_exps)
-        if (23 < weeks_ga_round < 43):
-            max_weeks_ga_round = weeks_ga_round
-            max_days_ga = days_ga
+
+        if not re.match(reg_exps['re_not_allowed'], match_str):
+            days_ga, weeks_ga_round = extract_from_cga_match(match_str,
+                    reg_exps)
+            if (23 < weeks_ga_round < 43):
+                max_weeks_ga_round = weeks_ga_round
+                max_days_ga = days_ga
+            else:
+                match_str = None
         else:
             match_str = None
     else:
@@ -228,13 +231,14 @@ def extract_gest_age(s, reg_exps, verbose=0):
         if len(matches) != 0:
             # Extract the match with the highest gestational age
             for m in range(len(matches)):
-                days_ga, weeks_ga_round = extract_from_ga_match(
-                        matches[m][0], reg_exps)
-                if ((weeks_ga_round > max_weeks_ga_round) and
-                        (23 < weeks_ga_round < 43)):
-                    max_weeks_ga_round = weeks_ga_round
-                    max_days_ga = days_ga
-                    match_str = matches[m][0]
+                if not re.match(reg_exps['re_not_allowed'], matches[m][0]):
+                    days_ga, weeks_ga_round = extract_from_ga_match(
+                            matches[m][0], reg_exps)
+                    if ((weeks_ga_round > max_weeks_ga_round) and
+                            (23 < weeks_ga_round < 43)):
+                        max_weeks_ga_round = weeks_ga_round
+                        max_days_ga = days_ga
+                        match_str = matches[m][0]
         else:
             if verbose: print(f'The GA cannot be extracted from: {s}')
 

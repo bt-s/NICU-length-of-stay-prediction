@@ -23,14 +23,16 @@ error_strings = [
     '22 weeks gestational age',
     '43 weeks gestational age',
     '3495 female',
-    '32 and 35 weeks gestation'
+    '32 and 35 weeks gestation',
+    '2915 gam',
+    '30 6/7 weeks gestation, Born at less than 32 weeks gestation;',
 ]
 
 
 class TestGAExtractor(unittest.TestCase):
     def test_error_strings(self):
         for s in error_strings:
-            m, d, w = extract_gest_age(s, reg_exps, verbose=1)
+            m, d, w = extract_gest_age(s, reg_exps, verbose=0)
             self.assertEqual([m, d, w], [None, 0, 0])
 
     def test_strings(self):
@@ -163,7 +165,8 @@ class TestGAExtractor(unittest.TestCase):
         m, d, w = extract_gest_age('prematurity at 34 5/7 weeks', reg_exps)
         self.assertEqual([d, w], [243, 35])
 
-        m, d, w = extract_gest_age('34 [**2-1**] wks gestation', reg_exps)
+        m, d, w = extract_gest_age('34 [**2-1**] wks gestation pregnancy',
+                reg_exps)
         self.assertTrue(238 <= d <= 244)
         self.assertTrue(w == 34 or w == 35)
 
@@ -171,51 +174,53 @@ class TestGAExtractor(unittest.TestCase):
         self.assertTrue(238 <= d <= 244)
         self.assertTrue(w == 34 or w == 35)
 
-        m, d, w = extract_gest_age('35 [**6-7**]-weeks gestation', reg_exps)
+        m, d, w = extract_gest_age('35 [**6-7**]-weeks gestational', reg_exps)
         self.assertTrue(245 <= d <= 251)
         self.assertTrue(w == 35 or w == 36)
 
         m, d, w = extract_gest_age('24.3 week GA', reg_exps)
         self.assertEqual([d, w], [171, 24])
 
-        m, d, w = extract_gest_age('33-week gestation', reg_exps)
+        m, d, w = extract_gest_age('33-week gestation born', reg_exps)
         self.assertEqual([d, w], [231, 33])
 
-        m, d, w = extract_gest_age('24-5/7 weeks gestation', reg_exps)
+        m, d, w = extract_gest_age('24-5/7 weeks gestation infant', reg_exps)
         self.assertEqual([d, w], [173, 25])
 
         m, d, w = extract_gest_age('37-2/7-week-gestational', reg_exps)
         self.assertEqual([d, w], [261, 37])
 
-        m, d, w = extract_gest_age('33-1/7 gestation', reg_exps)
+        m, d, w = extract_gest_age('33-1/7 gestational', reg_exps)
         self.assertEqual([d, w], [232, 33])
 
         m, d, w = extract_gest_age('38 week gestational', reg_exps)
         self.assertEqual([d, w], [266, 38])
 
-        m, d, w = extract_gest_age('38 4/7 weeks gestation', reg_exps)
+        m, d, w = extract_gest_age('38 4/7 weeks gestation triplet', reg_exps)
         self.assertEqual([d, w], [270, 39])
 
-        m, d, w = extract_gest_age('31/1  weeks gestation', reg_exps)
+        m, d, w = extract_gest_age('31/1  weeks gestational', reg_exps)
         self.assertEqual([d, w], [218, 31])
 
-        m, d, w = extract_gest_age('34.3 wks gestation', reg_exps)
+        m, d, w = extract_gest_age('34.3 wks gestation pregnancy', reg_exps)
         self.assertEqual([d, w], [241, 34])
 
-        m, d, w = extract_gest_age('and, 3, 12 weeks, 34-5/7-week    gestation',
+        m, d, w = extract_gest_age('34-5/7-week    gestation newborn',
                 reg_exps)
         self.assertEqual([d, w], [243, 35])
 
-        m, d, w = extract_gest_age('30 and 5/7th wks gestation', reg_exps)
+        m, d, w = extract_gest_age('30 and 5/7th wks gestation male', reg_exps)
         self.assertEqual([d, w], [215, 31])
 
-        m, d, w = extract_gest_age('30 and 5/7 weeks gestation', reg_exps)
+        m, d, w = extract_gest_age('30 and 5/7 weeks gestation female',
+                reg_exps)
         self.assertEqual([d, w], [215, 31])
 
         m, d, w = extract_gest_age('24 and 4/7 wks, g.a.', reg_exps)
         self.assertEqual([d, w], [172, 25])
 
-        m, d, w = extract_gest_age('34 and 4/7ths week gestational', reg_exps)
+        m, d, w = extract_gest_age('34 and 4/7ths week gestational age',
+                reg_exps)
         self.assertEqual([d, w], [242, 35])
 
         m, d, w = extract_gest_age('born at 35-5/7 weeks’\n gestation',
@@ -241,7 +246,7 @@ class TestGAExtractor(unittest.TestCase):
         m, d, w = extract_gest_age('29 week female', reg_exps)
         self.assertEqual([d, w], [203, 29])
 
-        m, d, w = extract_gest_age('40-2/7-\nweek gestation', reg_exps)
+        m, d, w = extract_gest_age('40-2/7-\nweek g.a.', reg_exps)
         self.assertEqual([d, w], [282, 40])
 
         m, d, w = extract_gest_age('delivered at 28 and 5/7 week', reg_exps)
@@ -299,7 +304,7 @@ class TestGAExtractor(unittest.TestCase):
             reg_exps)
         self.assertEqual([d, w], [283, 40])
 
-        m, d, w = extract_gest_age('Thirty-six and [**12-21**] week gestation',
+        m, d, w = extract_gest_age('Thirty-six and [**12-21**] week GA',
                 reg_exps)
         self.assertTrue(252 <= d <= 258)
         self.assertTrue(w == 36 or w == 37)
@@ -344,9 +349,57 @@ class TestGAExtractor(unittest.TestCase):
         self.assertTrue(w == 31 or w == 32)
 
         m, d, w = extract_gest_age(
-                '30 6/7 weeks gestation, Born at less than 32 weeks gestation;',
-                reg_exps)
+                'delivery of infant at 30 6/7 weeks gestation', reg_exps)
         self.assertEqual([d, w], [216, 31])
+
+        m, d, w = extract_gest_age('born at 34 and 3 weeks gestation',
+                reg_exps)
+        self.assertEqual([d, w], [241, 34])
+
+        m, d, w = extract_gest_age(
+                '[200~36 [**6-12**] week gestation male infant',
+                reg_exps)
+        self.assertTrue(252 <= d <= 258)
+        self.assertTrue(w == 36 or w == 37)
+
+        m, d, w = extract_gest_age('24 and [**5-14**] week premature twin',
+                reg_exps)
+        self.assertTrue(168 <= d <= 174)
+        self.assertTrue(w == 24 or w == 25)
+
+        m, d, w = extract_gest_age('DOL 7 / PMA 25-5/7', reg_exps)
+        self.assertEqual([d, w], [173, 25])
+
+        m, d, w = extract_gest_age('Prematurity 36 weeks gestation', reg_exps)
+        self.assertEqual([d, w], [252, 36])
+
+        m, d, w = extract_gest_age('38 week gestation female twin', reg_exps)
+        self.assertEqual([d, w], [266, 38])
+
+        m, d, w = extract_gest_age(
+                'Premature female infant at 36 weeks gestational', reg_exps)
+        self.assertEqual([d, w], [252, 36])
+
+        m, d, w = extract_gest_age('a 40 week gestation born to', reg_exps)
+        self.assertEqual([d, w], [280, 40])
+
+        m, d, w = extract_gest_age('born at approximately 33 weeks gestation',
+                reg_exps)
+        self.assertEqual([d, w], [231, 33])
+
+        m, d, w = extract_gest_age('39 week gestation) female newborn',
+                reg_exps)
+        self.assertEqual([d, w], [273, 39])
+
+        m, d, w = extract_gest_age('28 week gestation, female triplet #3',
+                reg_exps)
+        self.assertEqual([d, w], [196, 28])
+
+        m, d, w = extract_gest_age('32 4/7 weeks female newborn', reg_exps)
+        self.assertEqual([d, w], [228, 33])
+
+        m, d, w = extract_gest_age('41 week gestation infant', reg_exps)
+        self.assertEqual([d, w], [287, 41])
 
 
 if __name__ == '__main__':
