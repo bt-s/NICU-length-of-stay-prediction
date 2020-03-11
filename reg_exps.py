@@ -50,7 +50,7 @@ re_d_d_dash = re.compile('\d{1}-\d{1}')
 re_dd_d = re.compile('(\d{2}\/\d{1})|(\d{2}\.\d{1})|(\d{2}\ \d{1})')
 
 # Regex to capture common false gestational age
-re_false = re.compile('(born at less than 32 weeks gestation|\d{4} (fe)?male)')
+re_false = re.compile('(born at less than 32 weeks gestation|\d{4} (fe)?male|32 and 35 weeks gestation)')
 
 # Regex to split a corrected gestational age regex match string
 re_splitter = re.compile('(pma|ca|cga|now)')
