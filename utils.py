@@ -24,6 +24,9 @@ def read_icustays_table(mimic_iii_path, verbose=0):
     if verbose: print('Make sure that the time fields are datetime...')
     df.INTIME = pd.to_datetime(df.INTIME)
 
+    if verbose: print('Remove admission shorter than four hours...')
+    df = df[df.LOS >= 1/6]
+
     if verbose: print('Only keep NICU stays without transfers...')
     df = df[df.FIRST_CAREUNIT == 'NICU']
 
