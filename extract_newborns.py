@@ -123,6 +123,9 @@ def main(args):
     if verbose: print(f'{df.HOSPITAL_EXPIRE_FLAG.sum()}/{len(df)} newborns in '+
             'df died during their NICU admission.')
 
+    if verbose: print(f'Creating targets for admissions...')
+    df = set_targets(df)
+
     if verbose: print('Pickle dataframe...')
     df.to_pickle(args.output_path)
 
