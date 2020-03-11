@@ -13,16 +13,19 @@ import re
 
 re_ga = re.compile(
         '(((\d{2}|(twenty|thirty|forty)(-| |)?(one|two|three|four|five|six|' +
-        'seven|eight|nine)?)( +and +| +- +|-| +)? *(\[\*\*\d{1,2}-\d{1,2}' +
-        '\*\*\]|\d{1}|/|\.)?[\/|-]?(\d{1})? *(th|ths)?(-? *| +)((wk|week)s? *' +
-        '(infant|\[\*\*name)|(wk|week)?s?(,|-|\’)? *(est.?|estimated)? *(' +
-        'triplet|twin|\d{4} gram|(newborn|baby) (boy|girl)|(fe)?male|newborn' +
-        '(?! meds given)(?! (state )?screen)|premature|gestation|ga(?!uge)' +
-        '(?!ggy)(?!in)(?!vage)(?! spinal needle)(?!stro)|g\.a\.|ga\.)))|' +
-        '((former|ex|product of a|delivered at|born at|in labor at|gestation ' +
-        'at|gestation(al)? age (of|is)| ga|prematurity at)( +|-)\d{2}\+?(' +
-        ' +and +|-)? *(\[\*\*\d{1,2}-\d{1,2}\*\*\]|\d{1}/\d{1}|\d{1}-\d{1}|' +
-        '\d{1})?(th|ths)?-? *(week|wk)s? *-?(gestation|ga |g\.a\.|ga\.)?))')
+        'seven|eight|nine)?)( +(and|plus) +| +- +|-| +)? *(\[\*\*\d{1,2}-' +
+        '\d{1,2}\*\*\]|\d{1}|/|\.)?[\/|-]?(\d{1})? *(th|ths)?(-? *| +)' +
+        '((wk|week)s? *(gestation(\)|,)? (born|(fe)?male|newborn|infant|' +
+        'twin|triplet|pregnancy)|infant|\[\*\*name)|(wk|week)?s?(,|-|\’)? *' +
+        '(est.?|estimated)? *(triplet|twin|\d{4} gram|(newborn|baby) (boy|' +
+        'girl)|(fe)?male|newborn(?! meds given)(?! (state )?screen)|premature|' +
+        'gestational|ga(?!uge)(?!ggy)(?!in)(?!vage)(?! spinal needle)' +
+        '(?!stro)|g\.a\.|ga\.)))|((former|ex|product of a|(delivered|' +
+        'delivery)( of infant)? at|born at( approximately)?|in labor at|' +
+        'gestation at|gestation(al)? age (of|is)| ga|prematurity( at)?)' +
+        '( +|-)\d{2}\+?( +and +| +plus +|-)? *(\[\*\*\d{1,2}-\d{1,2}\*\*\]|' +
+        '\d{1}/\d{1}|\d{1}-\d{1}|\d{1})?(th|ths)?-? *(week|wk)s? *-?(' +
+        'gestation|ga |g\.a\.|ga\.)?))')
 
 # Regular expression to capture the corrected gestational age of a patient
 re_cga = re.compile(
@@ -46,11 +49,20 @@ re_d_d_slash = re.compile('\d{1}/\d{1}')
 # Regex to capture digit-digit
 re_d_d_dash = re.compile('\d{1}-\d{1}')
 
-# Regex to caputre digitdigit/digit, digitdigit.digit and digitdigit digit
-re_dd_d = re.compile('(\d{2}\/\d{1})|(\d{2}\.\d{1})|(\d{2}\ \d{1})')
+# Regex to caputre digitdigit/digit, digitdigit.digit, digitdigit digit,
+# digitdigit and digit, and digitdigit plus digit
+re_dd_d = re.compile('(\d{2}\/\d{1})|(\d{2}\.\d{1})|(\d{2}\ \d{1})|' +
+        '\d{2} +and +\d{1}|\d{2} +plus +\d{1}')
 
-# Regex to capture common false gestational age
-re_false = re.compile('(born at less than 32 weeks gestation|\d{4} (fe)?male|32 and 35 weeks gestation)')
+# Regex to capture common false gestational age phrases
+re_false = re.compile('(born at less than 32 weeks gestation|\d{4} (fe)?male|'+
+'32 and 35 weeks gestation|\d{4} ga)')
+
+# Regex to capture too simplistic gestational age phrases
+re_not_allowed = re.compile('^(\d{2}|(twenty|thirty|forty)(-| |)?(one|two|' +
+    'three|four|five|six|seven|eight|nine)?)( +and +| +- +|-| +)? ' +
+    '*(\[\*\*\d{1,2}-\d{1,2}\*\*\]|\d{1}|/|\.)?[\/|-]?(\d{1})? *(th|ths)?' +
+    '(-? *| +)(wk|week)s? *gestation$')
 
 # Regex to split a corrected gestational age regex match string
 re_splitter = re.compile('(pma|ca|cga|now)')
@@ -71,5 +83,6 @@ re_trans_filter = re.compile(
 reg_exps = {'re_ga': re_ga, 're_cga': re_cga, 're_dd': re_dd, 're_dol': re_dol,
         're_anon_dd_p': re_anon_dd_p, 're_d_d_slash': re_d_d_slash,
         're_d_d_dash': re_d_d_dash, 're_dd_d': re_dd_d, 're_false': re_false,
-        're_splitter': re_splitter, 're_trans_filter': re_trans_filter}
+        're_not_allowed': re_not_allowed, 're_splitter': re_splitter,
+        're_trans_filter': re_trans_filter}
 
