@@ -1,5 +1,6 @@
 import argparse, csv, os, pickle, sys
 import pandas as pd
+from tqdm import tqdm
 
 
 def parse_cl_args():
@@ -66,11 +67,7 @@ def read_and_split_events_table_by_subject(mimic_iii_path, table_name,
         # Create an iterative CSV reader that outputs a row to a dictionary
         csv_reader = csv.DictReader(table)
 
-        for i, row in enumerate(csv_reader):
-            if verbose and (i % 1000 == 0):
-                print(f'Processed {i}/{tot_nb_rows} rows in '
-                      f'{table_name.lower()}.csv')
-
+        for i, row in enumerate(tqdm(csv_reader, total=rows_per_table[table_name])):
             if subjects_to_keep and (int(row['SUBJECT_ID']) not in
                     subjects_to_keep):
                 continue
