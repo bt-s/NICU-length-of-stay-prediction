@@ -9,6 +9,8 @@ def parse_cl_args():
             description='Extract data from the MIMIC-III CSVs.')
     parser.add_argument('-ip', '--input-path', type=str,
             help='Path to MIMIC-III CSV files.')
+    parser.add_argument('-op', '--output-path', type=str,
+            default='data/', help='Path to output directory.')
     parser.add_argument('-tn', '--table-names', type=str, nargs='+',
             default=['test'],
             help='Name of the MIMIC-III events tables to be read.')
@@ -19,19 +21,13 @@ def parse_cl_args():
 
 
 def read_and_split_events_table_by_subject(mimic_iii_path, table_name,
-        output_path, subjects_to_keep=None, verbose=1):
+        output_path, subjects_to_keep=None, verbose=0):
 
     # Allow the table name to be passed both with lower- and uppercase letters
     table_name = table_name.upper()
 
-    # Create the output directory
-    try:
-        os.makedirs(output_path)
-    except:
-        pass
-
     if table_name not in ['TEST', 'TEST2', 'CHARTEVENTS', 'LABEVENTS',
-            'OUTPUT_EVENTS']:
+            'OUTPUTEVENTS']:
         raise ValueError("Table name must be one of: 'test', " +
             "'test2', 'chartevents', 'labevents', 'outputevents'")
     else:
@@ -46,16 +42,23 @@ def read_and_split_events_table_by_subject(mimic_iii_path, table_name,
     def write_row_to_file():
         # Define a filename for file holding the events of current_subject_id
         subject_f = os.path.join(output_path,
-                str(current_subject_id + '_events.csv'))
+                str(current_subject_id))
 
+        # Create the output directory
+        try:
+            os.makedirs(subject_f)
+        except:
+            pass
+
+        subject_events_f = os.path.join(subject_f, 'events.csv')
         # Create the file and give it its header if it doesn't exist yet
         if not os.path.exists(subject_f) or not os.path.isfile(subject_f):
-            f = open(subject_f, 'w')
+            f = open(subject_events_f, 'w')
             f.write(','.join(csv_header) + '\n')
             f.close()
 
         # Write current row to the file
-        with open(subject_f, 'a') as wf:
+        with open(subject_events_f, 'a') as wf:
             csv_writer = csv.DictWriter(wf, fieldnames=csv_header,
                 quoting=csv.QUOTE_MINIMAL)
             csv_writer.writerows(objects_to_write)
@@ -73,8 +76,11 @@ def read_and_split_events_table_by_subject(mimic_iii_path, table_name,
                 continue
 
             row_output = {'SUBJECT_ID': row['SUBJECT_ID'],
-                    'HADM_ID': row['HADM_ID'], 'CHARTTIME': row['CHARTTIME'],
-                    'ITEMID': row['ITEMID'], 'VALUE': row['VALUE'],
+                    'HADM_ID': row['HADM_ID'],
+                    'ICUSTAY_ID': '' if 'ICUSTAY_ID' not in row else row['ICUSTAY_ID']
+                    'CHARTTIME': row['CHARTTIME'],
+                    'ITEMID': row['ITEMID'],
+                    'VALUE': row['VALUE'],
                     'VALUEUOM': row['VALUEUOM']}
 
             # For efficiency only write row to file if subjects change
@@ -103,13 +109,9 @@ def main(args):
         print('The file data/subjects.pkl does not exist.')
         raise
 
-    table_names = args.table_names
-    mimic_iii_path, verbose = args.input_path, args.verbose
-    output_path = 'data/events_per_subject/'
-
-    for tn in table_names:
-        read_and_split_events_table_by_subject(mimic_iii_path, tn,
-                output_path, subjects, verbose)
+    for tn in args.table_names:
+        read_and_split_events_table_by_subject(args.input_path, tn,
+                args.output_path, subjects, args.verbose)
 
 
 if __name__ == '__main__':
