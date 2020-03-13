@@ -8,7 +8,7 @@ As part of my Master's thesis at KTH Royal Institute of Technology.
 
 __author__ = "Bas Straathof"
 
-import argparse
+import argparse, os, pickle
 from sys import argv
 
 from utils import *
@@ -22,7 +22,7 @@ def parse_cl_args():
     parser.add_argument('-ip', '--input-path', type=str,
             help='Path to MIMIC-III CSV files.')
     parser.add_argument('-op', '--output-path', type=str,
-            help='Path to desired output directory.')
+            default='data/', help='Path to desired output directory.')
     parser.add_argument('-v', '--verbose', type=int,
             help='Level of verbosity in console output.', default=1)
 
@@ -31,6 +31,11 @@ def parse_cl_args():
 
 def main(args):
     verbose, mimic_iii_path  = args.verbose, args.input_path
+
+    try:
+        os.makedirs(args.output_path)
+    except:
+        pass
 
     # Read the ADMISSIONS table
     df_admit, tot_admit, nb_admit = read_admissions_table(mimic_iii_path,
@@ -126,8 +131,17 @@ def main(args):
     if verbose: print(f'Creating targets for admissions...')
     df = set_targets(df)
 
+    if verbose: print('Split admissions by subject')
+    split_admissions_by_subject(df, args.output_path, verbose=0)
+
     if verbose: print('Pickle dataframe...')
-    df.to_pickle(args.output_path)
+    df.to_pickle(os.path.join(args.output_path, 'subjects.pkl'))
+
+    if verbose: print('Pickle list of subjects...')
+    subjects = set(df.SUBJECT_ID.to_list())
+
+    with open('data/subjects_list.pkl', 'wb') as f:
+        pickle.dump(subjects, f)
 
 
 if __name__ == '__main__':
