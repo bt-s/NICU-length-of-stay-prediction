@@ -289,3 +289,24 @@ def set_targets(df):
 
     return df
 
+
+def split_admissions_by_subject(df, output_path, verbose=0):
+    tot_nb_subjects = len(df.SUBJECT_ID.unique())
+
+    for i, (ix, row) in enumerate(df.iterrows()):
+        if verbose and i % 100 == 0:
+            print(f'Creating file for subject {i}/{tot_nb_subjects}')
+
+        subject_f = os.path.join(output_path, str(row.SUBJECT_ID))
+
+        try:
+            os.makedirs(subject_f)
+        except:
+            pass
+
+        df.ix[df.SUBJECT_ID == row.SUBJECT_ID].to_csv(
+            os.path.join(subject_f, 'admisisons.csv'), index=False)
+
+    if verbose:
+        print('Job done!\n')
+
