@@ -18,7 +18,8 @@ from word2number import w2n
 
 def read_icustays_table(mimic_iii_path, verbose=0):
     if verbose: print('Read ICUSTAYS table...')
-    df = pd.read_csv(os.path.join(mimic_iii_path, 'ICUSTAYS.csv'))
+    df = pd.read_csv(os.path.join(mimic_iii_path, 'ICUSTAYS.csv'),
+        dtype={'SUBJECT_ID': int, 'HADM_ID': int, 'ICUSTAY_ID': int})
     tot_icu_admit = len(df)
 
     if verbose: print('Make sure that the time fields are datetime...')
@@ -54,7 +55,8 @@ def read_icustays_table(mimic_iii_path, verbose=0):
 
 def read_admissions_table(mimic_iii_path, verbose=0):
     if verbose: print('Read ADMISSIONS table...')
-    df = pd.read_csv(os.path.join(mimic_iii_path, 'ADMISSIONS.csv'))
+    df = pd.read_csv(os.path.join(mimic_iii_path, 'ADMISSIONS.csv'),
+            dtype={'SUBJECT_ID': int, 'HADM_ID': int})
     tot_admit = len(df)
 
     if verbose: print('Only keep admissions of type NEWBORN...')
@@ -78,7 +80,8 @@ def read_admissions_table(mimic_iii_path, verbose=0):
 
 def read_patients_table(mimic_iii_path, verbose=0):
     if verbose: print('Read PATIENTS table...')
-    df = pd.read_csv(os.path.join(mimic_iii_path, 'PATIENTS.csv'))
+    df = pd.read_csv(os.path.join(mimic_iii_path, 'PATIENTS.csv'),
+            dtype={'SUBJECT_ID': int})
 
     # Only keep relevant columns
     df = df[['SUBJECT_ID', 'GENDER', 'DOB', 'DOD']]
@@ -305,7 +308,7 @@ def split_admissions_by_subject(df, output_path, verbose=0):
             pass
 
         df.ix[df.SUBJECT_ID == row.SUBJECT_ID].to_csv(
-            os.path.join(subject_f, 'admisisons.csv'), index=False)
+            os.path.join(subject_f, 'admission.csv'), index=False)
 
     if verbose:
         print('Job done!\n')
