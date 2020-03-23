@@ -50,7 +50,8 @@ def read_and_split_events_table_by_subject(mimic_iii_path, table_name,
 
         subject_events_f = os.path.join(subject_f, 'events.csv')
         # Create the file and give it its header if it doesn't exist yet
-        if not os.path.exists(subject_f) or not os.path.isfile(subject_f):
+        if not os.path.exists(subject_events_f) or \
+                not os.path.isfile(subject_events_f):
             f = open(subject_events_f, 'w')
             f.write(','.join(csv_header) + '\n')
             f.close()
