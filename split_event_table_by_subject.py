@@ -12,7 +12,6 @@ def parse_cl_args():
     parser.add_argument('-op', '--output-path', type=str,
             default='data/', help='Path to output directory.')
     parser.add_argument('-tn', '--table-names', type=str, nargs='+',
-            default=['test'],
             help='Name of the MIMIC-III events tables to be read.')
     parser.add_argument('-v', '--verbose', type=int,
             help='Level of verbosity in console output.', default=1)
@@ -22,27 +21,26 @@ def parse_cl_args():
 
 def read_and_split_events_table_by_subject(mimic_iii_path, table_name,
         output_path, subjects_to_keep=None, verbose=0):
+    rows_written = 0
 
     # Allow the table name to be passed both with lower- and uppercase letters
     table_name = table_name.upper()
 
-    if table_name not in ['TEST', 'TEST2', 'CHARTEVENTS', 'LABEVENTS',
-            'OUTPUTEVENTS']:
-        raise ValueError("Table name must be one of: 'test', " +
-            "'test2', 'chartevents', 'labevents', 'outputevents'")
+    if table_name not in ['CHARTEVENTS', 'LABEVENTS', 'OUTPUTEVENTS']:
+        raise ValueError("Table name must be one of: 'chartevents', " +
+             "'labevents', 'outputevents'")
     else:
-        rows_per_table = {'TEST': 9999, 'TEST2': 9999, 'CHARTEVENTS': 330712484,
-                'LABEVENTS': 27854056, 'OUTPUTEVENTS': 4349219}
+        rows_per_table = {'CHARTEVENTS': 330712484, 'LABEVENTS': 27854056,
+                'OUTPUTEVENTS': 4349219}
         tot_nb_rows = rows_per_table[table_name]
 
     # Create a header for the new CSV files to be created
-    csv_header = ['SUBJECT_ID', 'HADM_ID', 'CHARTTIME', 'ITEMID', 'VALUE',
-            'VALUEUOM']
+    csv_header = ['SUBJECT_ID', 'HADM_ID', 'ICUSTAY_ID', 'CHARTTIME', 'ITEMID',
+            'VALUE', 'VALUEUOM']
 
     def write_row_to_file():
         # Define a filename for file holding the events of current_subject_id
-        subject_f = os.path.join(output_path,
-                str(current_subject_id))
+        subject_f = os.path.join(output_path, str(current_subject_id))
 
         # Create the output directory
         try:
@@ -70,20 +68,23 @@ def read_and_split_events_table_by_subject(mimic_iii_path, table_name,
         # Create an iterative CSV reader that outputs a row to a dictionary
         csv_reader = csv.DictReader(table)
 
-        for i, row in enumerate(tqdm(csv_reader, total=rows_per_table[table_name])):
+        if verbose: print(f'Read {table_name.upper()}.csv...')
+        for i, row in enumerate(tqdm(csv_reader,
+            total = rows_per_table[table_name])):
             if subjects_to_keep and (int(row['SUBJECT_ID']) not in
                     subjects_to_keep):
                 continue
 
             row_output = {'SUBJECT_ID': row['SUBJECT_ID'],
                     'HADM_ID': row['HADM_ID'],
-                    'ICUSTAY_ID': '' if 'ICUSTAY_ID' not in row else row['ICUSTAY_ID']
+                    'ICUSTAY_ID': '' if 'ICUSTAY_ID' not in row else \
+                            row['ICUSTAY_ID'],
                     'CHARTTIME': row['CHARTTIME'],
                     'ITEMID': row['ITEMID'],
                     'VALUE': row['VALUE'],
                     'VALUEUOM': row['VALUEUOM']}
 
-            # For efficiency only write row to file if subjects change
+            # Only write row to file if current_subject_id changes
             if current_subject_id != '' and \
                     current_subject_id != row['SUBJECT_ID']:
                 write_row_to_file()
@@ -92,13 +93,18 @@ def read_and_split_events_table_by_subject(mimic_iii_path, table_name,
             objects_to_write.append(row_output)
             current_subject_id = row['SUBJECT_ID']
 
+            # Increment rows_written
+            rows_written += 1
+
+
         if i == tot_nb_rows:
             write_row_to_file()
             objects_to_write = []
 
         if verbose:
             print(f'Processed {i+1}/{tot_nb_rows} rows in '
-                    f'{table_name.lower()}.csv')
+                    f'{table_name.lower()}.csv\nIdentified '
+                    f'{rows_written} events in {table_name.lower()}.')
 
 
 def main(args):
