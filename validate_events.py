@@ -1,5 +1,6 @@
 import argparse
 import os
+import shutil
 
 from sys import argv
 from tqdm import tqdm
@@ -76,14 +77,22 @@ def main(args):
                 not df_admission.HADM_ID.isnull().any() and
                 len(df_admission == 1))
 
-        # Read the events for current subject
+        # Read the events for the current subject
         df_events = pd.read_csv(os.path.join(subjects_path, sd, 'events.csv'))
 
         # Validate events
         df_events, stats = validate_events(df_admission, df_events, stats)
 
-        # Write df_events to events.csv
-        df_events.to_csv(os.path.join(subjects_path, sd, 'events.csv'))
+        if not df.empty:
+            # Write df_events to events.csv
+            df_events.to_csv(os.path.join(subjects_path, sd, 'events.csv'))
+        else:
+            # Remove the folder
+            try:
+                shutil.rmtree(os.path.join(subjects_path, sd))
+                removed_subjects += 1
+            except OSError as e:
+                print (f'Error: {e.filename} - {e.strerror}.')
 
     if verbose:
         for k, v in stats.items():
