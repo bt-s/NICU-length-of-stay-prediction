@@ -11,6 +11,7 @@ __author__ = "Bas Straathof"
 import re
 
 
+# Regular expression to capture the gestational age of a patient
 re_ga = re.compile(
         '(((\d{2}|(twenty|thirty|forty)(-| |)?(one|two|three|four|five|six|' +
         'seven|eight|nine)?)( +(and|plus) +| +- +|-| +)? *(\[\*\*\d{1,2}-' +
@@ -79,10 +80,17 @@ re_trans_filter = re.compile(
         '*\d+ *\*\*\] +((due to|because of|for) * census reasons|nicu|' +
         '(neonatal|newborn) intensive care unit))')
 
+# Regex to capture digit over digit
+re_d_over_d = re.compile('^(\d+)/(\d+)$')
+
+# Regex to capture laboratory values
+re_lab_vals = re.compile('^(\d+(\.\d*)?|\.\d+)$')
+
 # Dictionary containing all regular expressions
 reg_exps = {'re_ga': re_ga, 're_cga': re_cga, 're_dd': re_dd, 're_dol': re_dol,
         're_anon_dd_p': re_anon_dd_p, 're_d_d_slash': re_d_d_slash,
         're_d_d_dash': re_d_d_dash, 're_dd_d': re_dd_d, 're_false': re_false,
         're_not_allowed': re_not_allowed, 're_splitter': re_splitter,
-        're_trans_filter': re_trans_filter}
+        're_trans_filter': re_trans_filter, 're_d_over_d': re_d_over_d,
+        're_lab_vals': re_lab_vals}
 
