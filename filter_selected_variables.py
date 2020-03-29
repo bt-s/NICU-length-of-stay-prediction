@@ -9,59 +9,101 @@ import shutil
 import pandas as pd
 
 vars_to_itemid = {
-    "Bilirubin": [
-        50885, 51464, 51465, 1538, 50883, 50884, 848, 225690,
-        803, 3765, 225651, 1527, 50838, 51028, 51049, 51465
+    "Bilirubin -- Direct": [
+        50883, 803,
+        # No occurences
+        # 225651, 1527
     ],
+    "Bilirubin -- Indirect": [
+        50884, 3765
+    ],
+    # Implicit in the combination of direct and indirect
+    #"Bilirubin -- Total": [
+        #50885, 1538
+        # Ambiguous or no occurrences
+        # 51464, 51465, 51028, 848, 225690, 50838, 51049
+    #],
     "Blood Pressure -- Diastolic": [
-        8368, 8441, 220180, 220051, 8502, 225310, 8555, 8440,
-        8503, 8504, 8506, 8507, 224643, 227242
+        8502, 8503, 8504, 8506, 8507,
+        # No occurrences
+        # 8368, 8441, 220180, 220051, 225310, 8555, 8440, 224643, 227242
     ],
-    "Blood Pressure -- Mean": [
-       52, 456, 220181, 220052, 3312, 225312, 224, 6702, 224322,
-       3314, 3316, 3322, 3320
-    ],
+    # Implicit in the combination of diastolic and systolic
+    #"Blood Pressure -- Mean": [
+    #3312, 3314, 3316, 3322, 3320
+    # No occurrences
+    # 52, 456, 220181, 220052, 225312, 224, 6702, 224322
+    #],
     "Blood Pressure -- Systolic": [
-       51, 455, 220179, 220050, 3313, 225309, 6701, 3315, 442,
-       3317, 3323, 3321, 224167, 227243,
+        3313, 3315, 3317, 3323, 3321
+        # No occurrences
+        # 51, 455, 220179, 220050, 225309, 6701, 442, 224167, 227243
     ],
     "Capillary Refill Rate": [
-       3348, 115, 8377
+        3348
+        # No occurrences
+        # 115, 8377
     ],
     "Fraction Inspired Oxygen": [
-       3420, 223835, 3422, 189, 727
+        3420, 3422
+        # No occurrences
+        # 223835, 189, 727
     ],
-    "Glucose": [
-       50931, 807, 811, 1529, 225664, 50809, 220621, 51478,
-       226537, 3745, 3744,
-    ],
+    #"Glucose": [ # Only ~2000 data points -- insufficient
+    #50931, 50809, 51478, 3745, 3744
+    # No occurrences
+    # 807, 811, 1529, 225664, 220621, 226537
+    #],
     "Heart Rate": [
-       211, 220045
+        211
+        # No occurrences
+        # 220045
     ],
     "Height": [
-       226707, 226730, 1394, 4188, 4187 # Check 4188 and 4187
+        4188
+        # Wrong unit
+        # 4187
+        # No occurrences
+        # 226707, 226730, 1394,
     ],
     "Oxygen Saturation": [
-       646, 220277, 834, 50817, 220227, 8498
+        834, 50817, 8498
+        # No occurrences
+        # 646, 220227, 220227
     ],
     "pH": [
-       50820, 780, 1126, 223830, 51491, 220734, 860, 4753,
-       220274, 3839, 4202, 1673, 50831, 51094 # Check 220734
+        50820, 51491, 860, 4753, 3839, 4202, 1673, 50831, 51094
+        # No occurrences
+        # 780, 1126, 223830, 220734, 220274
     ],
     "Respiratory Rate": [
-       678, 220210, 3603, 224689, 615, 224690, 614, 651,
-       224422
+        3603,
+        # No occurrences
+        # 220210, 224689, 615, 224690, 614, 651, 224422
     ],
     "Temperature": [
-       678, 677, 3655, 223761, 676, 679, 223762, 3654
+        3655, 3654
+        # No occurrences
+        # 676, 677, 678, 679, 223761, 223762
     ],
     "Weight": [
-        3580, 3581, 3582, 763, 224639, 226531, 226512,
-        3723, 4183, 3693,
-        # Birth weight: 3723, 4183
-        # Previous weight: 580, 581, 3583
-        # Weight change: 3692, 733
-        # Feeding weight: 226846
+        3580, 3693,
+        3723, 4183 # birth weight
+
+        # No occurrences
+        # 763, 224639, 226531, 226512
+
+        # Wrong unit
+        # 3581, 3582
+
+        # Previous weight
+        # 580, 581, 3583
+
+        # Weight change
+        # 3692, 733
+
+        # Feeding weight
+        # 226846
     ],
 }
 
@@ -79,6 +121,7 @@ def parse_cl_args():
 
 def main(args):
     verbose, subjects_path = args.verbose, args.subjects_path
+    if verbose: print("Filtering selected variables...")
     subject_directories = os.listdir(subjects_path)
     subject_directories = set(filter(lambda x: str.isdigit(x),
         subject_directories))
