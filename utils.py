@@ -12,6 +12,7 @@ import pandas as pd
 import numpy as np
 import os
 import re
+import datetime
 
 from word2number import w2n
 
@@ -317,4 +318,23 @@ def split_admissions_by_subject(df, output_path, verbose=0):
 
     if verbose:
         print('Job done!\n')
+
+
+def round_up_to_hour(dt):
+    if type(dt) == str:
+        date_format = "%Y-%m-%d %H:%M:%S"
+        dt = datetime.datetime.strptime(dt, date_format)
+
+    hour = 3600
+
+    # Seconds passed in current day
+    seconds = (dt - dt.min).seconds
+
+    # Floor division to closest next hour if not whole hour on clock
+    rounding = (seconds + hour-1) // hour * hour
+
+    # Use timedelta to set the rounded time
+    dt = dt + datetime.timedelta(0, rounding-seconds, -dt.microsecond)
+
+    return dt
 
