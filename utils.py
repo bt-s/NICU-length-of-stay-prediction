@@ -17,118 +17,6 @@ import datetime
 
 from word2number import w2n
 
-def read_admissions_table(mimic_iii_path, verbose=0):
-    if verbose: print('...read ADMISSIONS table...')
-    df = pd.read_csv(os.path.join(mimic_iii_path, 'ADMISSIONS.csv'),
-            dtype={'SUBJECT_ID': int, 'HADM_ID': int})
-    if verbose: print(f'Total admissions identified: {len(df)}')
-
-    # Data set filtered on NICU admissions
-    df = df[df.ADMISSION_TYPE == 'NEWBORN']
-    if verbose: print(f'Total NICU admissions identified: {len(df)}\n' \
-            f'Total unique NICU patients identified: {df.SUBJECT_ID.nunique()}')
-
-    # Data set filtered on newborn admissions
-    df = df[df.DIAGNOSIS == 'NEWBORN']
-
-    # Make sure that there are no duplicate SUBJECT_IDs in df
-    if verbose: print(f'Total newborn admissions identified: {len(df)}\n' \
-            f'Total unique newborn patients identified: {df.SUBJECT_ID.nunique()}')
-
-    # Only keep admissions with associated chartevents
-    df = df[df.HAS_CHARTEVENTS_DATA == 1]
-    if verbose: print(f'Filtered newborn admissions -- with chart events: {len(df)}')
-
-    # Keep relevant columns
-    df = df[['SUBJECT_ID', 'HADM_ID', 'ADMITTIME', 'DISCHTIME', 'DEATHTIME',
-        'HOSPITAL_EXPIRE_FLAG']]
-
-    # Make sure that the time fields are datatime
-    df.ADMITTIME = pd.to_datetime(df.ADMITTIME)
-    df.DISCHTIME = pd.to_datetime(df.DISCHTIME)
-    df.DEATHTIME = pd.to_datetime(df.DEATHTIME)
-
-    return df
-
-
-def read_icustays_table(mimic_iii_path, verbose=0):
-    if verbose: print('...read ICUSTAYS table...')
-    df = pd.read_csv(os.path.join(mimic_iii_path, 'ICUSTAYS.csv'),
-        dtype={'SUBJECT_ID': int, 'HADM_ID': int, 'ICUSTAY_ID': int})
-    if verbose: print(f'Total ICU stays identified: {len(df)}')
-
-    # Make sure that the time fields are datatime
-    df.INTIME = pd.to_datetime(df.INTIME)
-
-    df = df[df.FIRST_CAREUNIT == 'NICU']
-    if verbose: print(f'Total NICU stays identified: {len(df)}')
-
-    # Only keep NICU stays without transfers
-    df = df.loc[(df.FIRST_WARDID == df.LAST_WARDID) &
-            (df.FIRST_CAREUNIT == df.LAST_CAREUNIT)]
-    if verbose: print(f'Filtered NICU stays -- without transfers: {len(df)}')
-
-    # Only keep the first stay
-    df_first_admin = df[['SUBJECT_ID', 'INTIME']].groupby(
-            'SUBJECT_ID').min().reset_index()
-    df = df[df['INTIME'].isin(df_first_admin['INTIME'])]
-    if verbose: print(f'Filtered NICU stays -- first stay: {len(df)}')
-
-    # Remove admissions with undefined LOS
-    df = df[df.LOS.isnull() == False]
-    if verbose: print(f'Filtered NICU stays -- defined LOS: {len(df)}')
-
-    # Remove admission shorter than four hours
-    df = df[df.LOS >= 1/6]
-    if verbose: print(f'Filtered NICU stays -- longer than four hours: {len(df)}')
-
-    # Create rounded LOS_HOURS variable
-    df['LOS_HOURS'] = round(df['LOS']*24, 0).astype('int')
-
-    # Only keep relevant columns
-    df = df[['SUBJECT_ID', 'HADM_ID', 'ICUSTAY_ID', 'INTIME', 'OUTTIME', 'LOS',
-        'LOS_HOURS', 'FIRST_CAREUNIT', 'LAST_CAREUNIT', 'FIRST_WARDID',
-        'LAST_WARDID']]
-
-    return df
-
-def read_patients_table(mimic_iii_path, verbose=0):
-    if verbose: print('...read PATIENTS table...')
-    df = pd.read_csv(os.path.join(mimic_iii_path, 'PATIENTS.csv'),
-            dtype={'SUBJECT_ID': int})
-    if verbose: print(f'Total patients identified: {len(df)}')
-
-    # Only keep relevant columns
-    df = df[['SUBJECT_ID', 'GENDER', 'DOB', 'DOD']]
-
-    # Make sure that the time fields are datatime
-    df.DOB = pd.to_datetime(df.DOB)
-    df.DOD = pd.to_datetime(df.DOD)
-
-    return df
-
-
-def read_noteevents_table(mimic_iii_path, verbose=0):
-    if verbose: print('...read NOTEEVENTS table...')
-    df = pd.read_csv(os.path.join(mimic_iii_path, 'NOTEEVENTS.csv'))
-
-    # Only keep relevant columns
-    df = df[['SUBJECT_ID', 'HADM_ID', 'CHARTDATE', 'CHARTTIME', 'CATEGORY',
-        'DESCRIPTION', 'ISERROR', 'TEXT']]
-
-    return df
-
-
-def read_labevents_table(mimic_iii_path, verbose=0):
-    if verbose: print('...read LABEVENTS table...')
-    df = pd.read_csv(mimic_iii_path + 'LABEVENTS.csv')
-
-    # Only keep relevant columns
-    df = df[['SUBJECT_ID', 'HADM_ID', 'ITEMID', 'CHARTTIME', 'VALUE',
-        'VALUENUM', 'VALUEUOM', 'FLAG']]
-
-    return df
-
 
 def filter_on_newborns(df):
     df['AGE'] = (df['ADMITTIME'] - df['DOB']).dt.days
@@ -206,7 +94,7 @@ def extract_from_ga_match(match_ga, reg_exps):
     return days_ga, weeks_ga_round
 
 
-def extract_gest_age(s, reg_exps, verbose=0):
+def extract_gest_age_from_note(s, reg_exps, verbose=0):
     # We want to find the maximum reported value in the clinical note
     match_str, max_days_ga, max_weeks_ga_round = None, 0, 0
 
@@ -323,27 +211,6 @@ def los_hours_to_target(hours):
         target = 9
 
     return target
-
-
-def split_admissions_by_subject(df, output_path, verbose=0):
-    tot_nb_subjects = len(df.SUBJECT_ID.unique())
-
-    for i, (ix, row) in enumerate(df.iterrows()):
-        if verbose and i % 250 == 0:
-            print(f'Creating file for subject {i}/{tot_nb_subjects}')
-
-        subject_f = os.path.join(output_path, str(row.SUBJECT_ID))
-
-        try:
-            os.makedirs(subject_f)
-        except:
-            pass
-
-        df.ix[df.SUBJECT_ID == row.SUBJECT_ID].to_csv(
-            os.path.join(subject_f, 'admission.csv'), index=False)
-
-    if verbose:
-        print('Job done!\n')
 
 
 def round_up_to_hour(dt):
