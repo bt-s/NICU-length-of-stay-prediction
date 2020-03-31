@@ -1,6 +1,21 @@
+#!/usr/bin/python3
+
+"""extract_event_data_per_subjects.py
+
+Script to extract data of clinical events from the MIMIC-II CSVs corresponding
+to newborn patients at the neontal ICU.  For each patient an output directory is
+created, in which the data is stored in a file called events.csv or notes.csv.
+"""
+
+__author__ = "Bas Straathof"
+
 import argparse, csv, os, pickle, sys
+
+import multiprocessing as mp
 import pandas as pd
+
 from tqdm import tqdm
+from itertools import repeat
 
 
 def parse_cl_args():
@@ -9,9 +24,12 @@ def parse_cl_args():
             description='Extract data from the MIMIC-III CSVs.')
     parser.add_argument('-ip', '--input-path', type=str,
             help='Path to MIMIC-III CSV files.')
+    parser.add_argument('-sp', '--subjects-path', type=str, default='data/',
+            help='Path to subject directories.')
     parser.add_argument('-op', '--output-path', type=str,
             default='data/', help='Path to output directory.')
-    parser.add_argument('-tn', '--table-names', type=str, nargs='+',
+    parser.add_argument('-tn', '--table-names', type=str,
+            default=['chartevents', 'labevents', 'noteevents'], nargs='+',
             help='Name of the MIMIC-III tables to be read.')
     parser.add_argument('-v', '--verbose', type=int,
             help='Level of verbosity in console output.', default=1)
@@ -20,8 +38,7 @@ def parse_cl_args():
 
 
 def read_and_split_table_by_subject(mimic_iii_path, table_name, output_path,
-    subjects_to_keep=None, verbose=0):
-    rows_written = 0
+    subjects_to_keep=None, verbose=0, n=0):
 
     # Allow the table name to be passed both with lower- and uppercase letters
     table_name = table_name.upper()
@@ -77,9 +94,10 @@ def read_and_split_table_by_subject(mimic_iii_path, table_name, output_path,
         # Create an iterative CSV reader that outputs a row to a dictionary
         csv_reader = csv.DictReader(table)
 
+        rows_written = 0
         if verbose: print(f'Read {table_name.upper()}.csv...')
         for i, row in enumerate(tqdm(csv_reader,
-            total = rows_per_table[table_name])):
+            total = rows_per_table[table_name], position=n)):
             if subjects_to_keep and (int(row['SUBJECT_ID']) not in
                     subjects_to_keep):
                 continue
@@ -126,16 +144,19 @@ def read_and_split_table_by_subject(mimic_iii_path, table_name, output_path,
 
 
 def main(args):
-    try:
-        with open('data/subjects_list.pkl', 'rb') as f:
-            subjects = pickle.load(f)
-    except IOError:
-        print('The file data/subjects.pkl does not exist.')
-        raise
+    subjects_path, verbose = args.subjects_path, args.verbose
 
-    for tn in args.table_names:
-        read_and_split_table_by_subject(args.input_path, tn, args.output_path,
-                subjects, args.verbose)
+    # Read the current subject directories to obtain a list of subjects to keep
+    subjects_to_keep = set([int(x) for x in os.listdir(subjects_path) if \
+            os.path.isdir(subjects_path + x)])
+
+    # Read and split the tables -- using multiprocessing to read the tables
+    # simultaneously
+    with mp.Pool() as p:
+        p.starmap(read_and_split_table_by_subject, zip(repeat(args.input_path),
+            args.table_names, repeat(args.output_path),
+            repeat(subjects_to_keep), repeat(verbose),
+            range(len(args.table_names))))
 
 
 if __name__ == '__main__':
