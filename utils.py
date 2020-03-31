@@ -12,6 +12,7 @@ import pandas as pd
 import numpy as np
 import os
 import re
+import time
 import datetime
 
 from word2number import w2n
@@ -299,6 +300,31 @@ def set_targets(df):
     return df
 
 
+def los_hours_to_target(hours):
+    if hours < 24:
+        target = 0
+    elif 24 <= hours < 48:
+        target = 1
+    elif 48 <= hours < 72:
+        target = 2
+    elif 72 <= hours < 96:
+        target = 3
+    elif 96 <= hours < 120:
+        target = 4
+    elif 120 <= hours < 144:
+        target = 5
+    elif 144 <= hours < 168:
+        target = 6
+    elif 168 <= hours < 192:
+        target = 7
+    elif 192 <= hours < 336:
+        target = 8
+    elif 336 <= hours:
+        target = 9
+
+    return target
+
+
 def split_admissions_by_subject(df, output_path, verbose=0):
     tot_nb_subjects = len(df.SUBJECT_ID.unique())
 
@@ -337,4 +363,35 @@ def round_up_to_hour(dt):
     dt = dt + datetime.timedelta(0, rounding-seconds, -dt.microsecond)
 
     return dt
+
+
+def compute_ga_weeks_for_charttime(charttime, intime, ga_days_birth):
+    return round(((charttime - intime).days + ga_days_birth) / 7)
+
+
+def compute_remaining_los(charttime, intime, los_hours_total):
+    return round(los_hours_total - (charttime - intime) \
+            .total_seconds() // 3600)
+
+
+def get_first_valid_value(ts, variable):
+    value = np.nan
+    if variable in ts:
+        # Find the indices of the rows where variable has a value in ts
+        indices = ts[variable].notnull()
+        if indices.any():
+            index = indices.to_list().index(True)
+            value = ts[variable].iloc[index]
+    return value
+
+
+def timing(f):
+    def wrap(*args):
+        time1 = time.time()
+        ret = f(*args)
+        time2 = time.time()
+        print(f'{f.__name__} function took {round(time2-time1, 3)} s')
+
+        return ret
+    return wrap
 
