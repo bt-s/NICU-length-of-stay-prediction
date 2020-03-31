@@ -7,6 +7,7 @@ from sys import argv
 import os
 import argparse
 import shutil
+import datetime
 
 
 def parse_cl_args():
@@ -204,12 +205,16 @@ def main(args):
 
         tot_events += len(df_events)
 
+        # Clean variables
         df_events = clean_variables(df_events)
+
+        # Clean charttime -- we know from the format that the length should always be 19
+        df_events = df_events[df_events.CHARTTIME.str.len() == 19]
+
         tot_events_kept += len(df_events)
 
         # Write df_events to events.csv if not empty, remove otherwise
         if not df_events.empty:
-            pass
             df_events.to_csv(os.path.join(subjects_path, str(subject_dir),
                 'events.csv'), index=False)
         else:
