@@ -12,6 +12,7 @@ import datetime, os, re, shutil, time
 
 import pandas as pd
 import numpy as np
+import multiprocessing.pool as mpp
 
 from word2number import w2n
 
@@ -346,4 +347,29 @@ def remove_subject_dir(path):
         shutil.rmtree(path)
     except OSError as e:
         print (f'Error: {e.filename} - {e.strerror}.')
+
+
+def istarmap(self, func, iterable, chunksize=1):
+    """Starmap-version of mpp.imap
+
+    Obtained from: https://stackoverflow.com/questions/57354700/
+                   starmap-combined-with-tqdm
+    """
+    if self._state != mpp.RUN:
+        raise ValueError("Pool not running")
+
+    if chunksize < 1:
+        raise ValueError("Chunksize must be 1+, not {0:n}".format(
+                chunksize))
+
+    task_batches = mpp.Pool._get_tasks(func, iterable, chunksize)
+    result = mpp.IMapIterator(self._cache)
+    self._taskqueue.put((self._guarded_task_generation(result._job,
+        mpp.starmapstar, task_batches),
+        result._set_length))
+
+    return (item for chunk in result for item in chunk)
+
+
+mpp.Pool.istarmap = istarmap
 
