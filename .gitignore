@@ -131,3 +131,5 @@ dmypy.json
 *.ipynb
 /data/
 subjects.txt
+*csv
+output*
