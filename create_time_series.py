@@ -2,7 +2,7 @@
 
 """create_timeseries.py
 
-Script to create timesries from preprocessed the clinical events tables
+Script to create timeseries from preprocessed the clinical events tables
 """
 
 __author__ = "Bas Straathof"
@@ -78,8 +78,12 @@ def create_timeseries(variables, df_events, df_stay, df_notes=None):
 
     # Add GA days to timeseries
     ga_days = df_stay.iloc[0].GA_DAYS
-    df_ts['GESTATIONAL_AGE_DAYS'] = df_ts['CHARTTIME'].apply(lambda x:
+    df_ts.GESTATIONAL_AGE_DAYS = df_ts['CHARTTIME'].apply(lambda x:
             compute_ga_days_for_charttime(x, intime, ga_days))
+
+    # One-hot-encode the capillary refill rate variable
+    df_ts = pd.get_dummies(df_ts, prefix=['CAPILLARY_REFILL_RATE'],
+            columns=['CAPILLARY_REFILL_RATE'])
 
     # Add target LOS to timeseries
     los_hours = df_stay.iloc[0].LOS_HOURS
