@@ -39,9 +39,8 @@ def parse_cl_args():
 
 def main(args):
     mimic_iii_path, output_path  = args.input_path, args.output_path
-    verbose = args.verbose
 
-    v_print = print if verbose else lambda *a, **k: None
+    v_print = print if args.verbose else lambda *a, **k: None
 
     try:
         os.makedirs(output_path)
@@ -110,7 +109,8 @@ def main(args):
 
     v_print('...merge patients information into dataframe...')
     df = df.merge(df_pat, how='inner', on='SUBJECT_ID')
-    v_print(f'Filtered NICU admissions -- with patient information: {df.shape[0]}')
+    v_print(f'Filtered NICU admissions -- with patient information: '
+            f'{df.shape[0]}')
 
     v_print("...remove admissions of non-newborn patients...")
     df = filter_on_newborns(df)
@@ -181,7 +181,7 @@ def main(args):
     tot_nb_subjects = len(df.SUBJECT_ID.unique())
 
     for i, (ix, row) in enumerate(tqdm(df.iterrows(), total=df.shape[0])):
-        if verbose and i % 250 == 0:
+        if args.verbose and i % 250 == 0:
             print(f'Creating file for subject {i}/{tot_nb_subjects}')
 
         subject_f = os.path.join(output_path, str(row.SUBJECT_ID))
