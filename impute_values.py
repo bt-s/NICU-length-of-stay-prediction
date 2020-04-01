@@ -32,9 +32,18 @@ def parse_cl_args():
     return parser.parse_args(argv[1:])
 
 
-def impute(subject_dir, normal_values, write_to_file=False):
+def impute(subject_dir, normal_values, mask=True):
     ts = pd.read_csv(os.path.join(subject_dir, 'timeseries.csv'))
+    ts = ts.set_index('CHARTTIME')
+
     variables = list(normal_values.keys())
+
+    if mask:
+        # Create an imputation mask
+        ts_mask = ts.mask(ts.notna(), 1)
+        ts_mask = ts_mask.mask(ts.isna(), 0)
+        ts_mask = ts_mask.drop(['TARGET'], axis=1)
+        ts_mask = ts_mask.add_prefix('mask_')
 
     # Make sure that the first row contains values such that we can
     # do a forward fill impute
@@ -50,8 +59,11 @@ def impute(subject_dir, normal_values, write_to_file=False):
     # Impute through forward filling
     ts = ts.fillna(method='ffill')
 
-    if write_to_file:
-        ts.to_csv(os.path.join(sd, 'timeseries.csv'), index=False)
+    if mask:
+        # Concatenate the timeseries with the imputation mask
+        ts = pd.concat([ts, ts_mask], axis=1)
+
+    ts.to_csv(os.path.join(subject_dir, 'timeseries_imputed.csv'))
 
 
 def main(args):
@@ -74,3 +86,4 @@ def main(args):
 
 if __name__ == '__main__':
     main(parse_cl_args())
+
