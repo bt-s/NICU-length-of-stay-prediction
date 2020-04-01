@@ -1,11 +1,23 @@
-import os
-import argparse
+#!/usr/bin/python3
+
+"""create_timeseries.py
+
+Script to create timesries from preprocessed the clinical events tables
+"""
+
+__author__ = "Bas Straathof"
+
+import argparse, json, os
+
 import pandas as pd
 import numpy as np
+
 from tqdm import tqdm
 from sys import argv
-from utils import round_up_to_hour, compute_ga_weeks_for_charttime, \
-        compute_remaining_los, los_hours_to_target, get_first_valid_value
+
+from utils import round_up_to_hour, compute_ga_days_for_charttime, \
+        compute_remaining_los, los_hours_to_target, \
+        get_first_valid_value_from_ts, remove_subject_dir
 
 
 def parse_cl_args():
@@ -13,83 +25,82 @@ def parse_cl_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('-sp', '--subjects-path', type=str, default='data/',
             help='Path to subject directories.')
+    parser.add_argument('-cp', '--config-path', type=str, default='config.json',
+            help='Path to the JSON configuration file.')
     parser.add_argument('-v', '--verbose', type=int,
             help='Level of verbosity in console output.', default=1)
 
     return parser.parse_args(argv[1:])
 
-variables = [
-    'Bilirubin -- Direct',
-    'Bilirubin -- Indirect',
-    'Blood Pressure -- Diastolic',
-    'Blood Pressure -- Systolic',
-    'Capillary Refill Rate',
-    'Fraction Inspired Oxygen',
-    'Gestational Age -- Weeks',
-    'Heart Rate',
-    'Height',
-    'Oxygen Saturation',
-    'pH',
-    'Respiratory Rate',
-    'TARGET',
-    'Temperature',
-    'Weight'
-]
 
-def create_timeseries(df_events, df_admit, variables=variables):
-    # If not hour on clock, round up CHARTTIME to nearest hour
+def create_timeseries(variables, df_events, df_stay, df_notes=None):
+    """Create timeseries from clinical events (and notes)
+
+    Args:
+        variables (dict): All variables to be present in the timeseries
+        df_events: Dataframe containing all clinical events of ICU stay
+        df_stay: Dataframe containing information about ICU stay
+        df_notes: Dataframe containing notes about ICU stay
+
+    Returns:
+        df_ts: Dataframe containing the timesries of the ICU stay
+    """
+    # If not hour on clock, round up charttime to nearest hour
     df_events.CHARTTIME = df_events.CHARTTIME.apply(
             lambda x: round_up_to_hour(x))
 
-    intime = round_up_to_hour(df_admit.iloc[0]['INTIME'])
+    # Round up intime
+    intime = round_up_to_hour(df_stay.iloc[0]['INTIME'])
 
     # Sort df_events by CHARTTIME; only keep the last value of a variable per
     # timestamp
-    timeseries = df_events[['CHARTTIME', 'VARIABLE', 'VALUE', 'ITEMID']] \
+    df_ts = df_events[['CHARTTIME', 'VARIABLE', 'VALUE', 'ITEMID']] \
             .sort_values(by=['CHARTTIME', 'VARIABLE', 'VALUE'], axis=0) \
             .drop_duplicates(subset=['CHARTTIME', 'VARIABLE'], keep='last')
 
     # Only keep first birth weight
-    timeseries = timeseries[~(timeseries.duplicated(['ITEMID'], keep='first') &
-        timeseries.ITEMID.isin([3723, 4183]))]
+    df_ts = df_ts[~(df_ts.duplicated(['ITEMID'], keep='first') &
+        df_ts.ITEMID.isin([3723, 4183]))]
 
     # Pivot the dataframe s.t. the column names are the variables
-    timeseries = timeseries.pivot(index='CHARTTIME', columns='VARIABLE',
+    df_ts = df_ts.pivot(index='CHARTTIME', columns='VARIABLE',
             values='VALUE').sort_index(axis=0).reset_index()
 
-    # Make sure that the timeseries contains all variables
+    # Make sure that the timeeries contains all variables
     for v in variables:
-        if v not in timeseries:
-            timeseries[v] = np.nan
+        if v not in df_ts:
+            df_ts[v] = np.nan
 
-    # Make sure that if Weight and Height values are present, that the first
+    # Make sure that if WEIGHT and HEIGHT values are present, that the first
     # first row in the timeseries contain a value
-    timeseries.Weight.iloc[0] = get_first_valid_value(timeseries, 'Weight')
-    timeseries.Height.iloc[0] = get_first_valid_value(timeseries, 'Height')
+    df_ts.WEIGHT.iloc[0] = get_first_valid_value_from_ts(df_ts, 'WEIGHT')
+    df_ts.HEIGHT.iloc[0] = get_first_valid_value_from_ts(df_ts, 'HEIGHT')
 
-    # Add GA weeks to timeseries
-    ga_days = df_admit.iloc[0].GA_DAYS
-    timeseries['Gestational Age -- Weeks'] = \
-            timeseries['CHARTTIME'].apply(lambda x:
-                    compute_ga_weeks_for_charttime(x, intime, ga_days))
+    # Add GA days to timeseries
+    ga_days = df_stay.iloc[0].GA_DAYS
+    df_ts['GESTATIONAL_AGE_DAYS'] = df_ts['CHARTTIME'].apply(lambda x:
+            compute_ga_days_for_charttime(x, intime, ga_days))
 
     # Add target LOS to timeseries
-    los_hours = df_admit.iloc[0].LOS_HOURS
-    timeseries['TARGET'] = \
-            timeseries['CHARTTIME'].apply(lambda x:
-                    los_hours_to_target(compute_remaining_los(
-                        x, intime, los_hours)))
+    los_hours = df_stay.iloc[0].LOS_HOURS
+    df_ts['TARGET'] = df_ts['CHARTTIME'].apply(lambda x:
+            los_hours_to_target(compute_remaining_los(x, intime, los_hours)))
 
-    return timeseries
+    return df_ts
 
 
 def main(args):
     verbose, subjects_path = args.verbose, args.subjects_path
+    removed_subjects, tot_events, tot_events_kept = 0, 0, 0
+
+    with open(args.config_path) as f:
+        config = json.load(f)
+        variables = config['variables']
+
     subject_directories = os.listdir(subjects_path)
     subject_directories = set(filter(lambda x: str.isdigit(x),
         subject_directories))
     tot_subjects = len(subject_directories)
-    removed_subjects, tot_events, tot_events_kept = 0, 0, 0
 
     for i, subject_dir in enumerate(tqdm(subject_directories)):
         # Read the events dataframe
@@ -97,22 +108,19 @@ def main(args):
             'events.csv'))
 
         # Read the admission dataframe
-        df_admit = pd.read_csv(os.path.join(subjects_path, str(subject_dir),
-            'admission.csv'))
+        df_stay = pd.read_csv(os.path.join(subjects_path, str(subject_dir),
+            'stay.csv'))
 
         # Create the timeseries
-        timeseries = create_timeseries(df_events, df_admit)
+        df_ts = create_timeseries(variables, df_events, df_stay)
 
         # Write timeseries to timeseries.csv if not empty, remove otherwise
-        if not timeseries.empty:
-            timeseries.to_csv(os.path.join(subjects_path, str(subject_dir),
+        if not df_ts.empty:
+            df_ts.to_csv(os.path.join(subjects_path, str(subject_dir),
                 'timeseries.csv'), index=False)
         else:
-            try:
-                shutil.rmtree(os.path.join(subjects_path, str(subject_dir)))
-                removed_subjects += 1
-            except OSError as e:
-                print (f'Error: {e.filename} - {e.strerror}.')
+            remove_subject_dir(os.path.join(subjects_path, str(subject_dir)))
+            removed_subjects += 1
 
     if verbose:
         print(f'Of the initial {tot_subjects} subjects, ' \
