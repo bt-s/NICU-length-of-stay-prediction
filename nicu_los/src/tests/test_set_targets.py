@@ -1,4 +1,12 @@
-from utils import los_hours_to_target
+#!/usr/bin/python3
+
+"""test_set_targets.py
+    - Contains tests for testing the los_hours_to_target() function.
+"""
+
+__author__ = "Bas Straathof"
+
+from ..utils.preprocessing_utils import los_hours_to_target
 import unittest
 import pandas as pd
 

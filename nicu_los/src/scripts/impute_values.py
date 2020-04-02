@@ -16,7 +16,7 @@ from itertools import repeat
 import multiprocessing as mp
 import pandas as pd
 
-from utils import istarmap
+from ..utils.utils import get_subject_dirs, istarmap
 
 
 def parse_cl_args():
@@ -24,15 +24,25 @@ def parse_cl_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('-sp', '--subjects-path', type=str, default='data/',
             help='Path to subject directories.')
-    parser.add_argument('-cp', '--config-path', type=str, default='config.json',
-            help='Path to the JSON configuration file.')
-    parser.add_argument('-v', '--verbose', type=int,
-            help='Level of verbosity in console output.', default=1)
+    parser.add_argument('-im', '--impute-method', type=str, default='ffill',
+            help='Impute method to use: either "ffill" or "zeros".')
+    parser.add_argument('-ma', '--mask', type=str, default=True,
+            help='Whether to create binary imputation indicator variables.')
+    parser.add_argument('-v', '--verbose', type=str, default=True,
+            help='Console output verbosity flag.')
 
     return parser.parse_args(argv[1:])
 
 
-def impute(subject_dir, normal_values, mask=True):
+def impute(subject_dir, normal_values, method='ffill', mask=True):
+    """Forward fill impute missing values with normal values
+
+    Args:
+        subject_dir (str): String to the subject directory
+        normal_values (dict): Normal values for selected variables
+        method (str): Either 'ffill' or 'zeros' -- determines impute method
+        mask (bool): Whether to create binary imputation masks
+    """
     ts = pd.read_csv(os.path.join(subject_dir, 'timeseries.csv'))
     ts = ts.set_index('CHARTTIME')
 
@@ -56,8 +66,15 @@ def impute(subject_dir, normal_values, mask=True):
             else:
                 ts[var].iloc[0] = normal_values[var]
 
-    # Impute through forward filling
-    ts = ts.fillna(method='ffill')
+
+    if method == 'ffill':
+        # Impute through forward filling
+        ts = ts.fillna(method='ffill')
+    elif method == 'zeros':
+        # Impute through filling with zeros
+        ts = ts.fillna(value=0)
+    else:
+        raise ValueError(f'{method} must be one of "ffill" or "zeros"')
 
     if mask:
         # Concatenate the timeseries with the imputation mask
@@ -67,20 +84,19 @@ def impute(subject_dir, normal_values, mask=True):
 
 
 def main(args):
-    verbose, subjects_path = args.verbose, args.subjects_path
-
-    with open(args.config_path) as f:
+    with open('nicu_los/config.json') as f:
         config = json.load(f)
         normal_values = config['normal_values']
 
-    subject_directories = os.listdir(subjects_path)
-    subject_directories = set(filter(lambda x: str.isdigit(x),
-        subject_directories))
-    subject_directories = [subjects_path + sd for sd in subject_directories]
+    if args.verbose:
+        print(f'Starting forward fill imputing with normal values.' \
+               f'Binary imputation mask: {args.mask}')
+    subject_directories = get_subject_dirs(args.subjects_path)
 
     with mp.Pool() as pool:
         for _ in tqdm(pool.istarmap(impute, zip(subject_directories,
-            repeat(normal_values))), total=len(subject_directories)):
+            repeat(normal_values), repeat(args.impute_method),
+            repeat(args.mask))), total=len(subject_directories)):
             pass
 
 

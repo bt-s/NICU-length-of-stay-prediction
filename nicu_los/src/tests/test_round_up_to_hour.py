@@ -1,4 +1,12 @@
-from utils import round_up_to_hour
+#!/usr/bin/python3
+
+"""test_round_up_to_hour.py
+    - Contains tests for testing the round_up_to_hour() function.
+"""
+
+__author__ = "Bas Straathof"
+
+from ..utils.utils import round_up_to_hour
 import datetime
 import unittest
 
@@ -29,4 +37,5 @@ class TestRoundUpToHour(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
 

@@ -133,3 +133,5 @@ dmypy.json
 subjects.txt
 *csv
 output*
+*.swp
+*.swo

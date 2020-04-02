@@ -1,5 +1,13 @@
-from utils import transfer_filter
-from reg_exps import re_trans_filter
+#!/usr/bin/python3
+
+"""test_transfer_filter.py
+    - Contains tests for testing the transfer_filter() function.
+"""
+
+__author__ = "Bas Straathof"
+
+from ..utils.preprocessing_utils import transfer_filter
+from ..utils.reg_exps import reg_exps
 import unittest
 
 test_strings = [
@@ -43,10 +51,10 @@ test_strings = [
     'discharge disposition:  to level iii'
 ]
 
-class TestGAExtractor(unittest.TestCase):
+class TestTransferFilter(unittest.TestCase):
     def test_strings(self):
         for s in test_strings:
-            m = transfer_filter(s, re_trans_filter)
+            m = transfer_filter(s, reg_exps)
             self.assertTrue(m != None)
 
 if __name__ == '__main__':

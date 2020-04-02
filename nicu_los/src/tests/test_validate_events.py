@@ -1,4 +1,14 @@
-from validate_events_and_notes import validate_events_and_notes
+#!/usr/bin/python3
+
+"""test_validate_events.py
+    - Contains tests for testing the validate_events_and_notes_per_subject()
+      function.
+"""
+
+__author__ = "Bas Straathof"
+
+from ..utils.preprocessing_utils import \
+        validate_events_and_notes_per_subject
 import unittest
 import pandas as pd
 
@@ -23,27 +33,26 @@ class TestEventValidator(unittest.TestCase):
             'TEXT': []})
 
 
-        self.stats_events = {'tot_nb_events': 0, 'no_value': 0,
-                'no_charttime': 0, 'incorrect_charttime': 0,
-                'no_hadm_id_and_icustay_id': 0, 'incorrect_hadm_id': 0,
-                'incorrect_icustay_id': 0, 'final_nb_events': 0}
-
-        self.stats_notes = {'tot_nb_notes': 0, 'no_text': 0,
-                'incorrect_charttime': 0, 'incorrect_hadm_id': 0,
-                'final_nb_notes': 0}
+        self.stats = {'events_tot_nb_events': 0, 'events_no_value': 0,
+                'events_no_charttime': 0, 'events_incorrect_charttime': 0,
+                'events_no_hadm_id_and_icustay_id': 0,
+                'events_incorrect_hadm_id': 0, 'events_incorrect_icustay_id': 0,
+                'events_final_nb_events': 0, 'notes_tot_nb_notes': 0,
+                'notes_no_text': 0, 'notes_incorrect_charttime': 0,
+                'notes_incorrect_hadm_id': 0, 'notes_final_nb_notes': 0}
 
     def test_validate_events(self):
-        df_events, df_notes, stats_events, stats_notes = \
-                validate_events_and_notes(self.df_admission, self.df_events,
-                self.df_notes, self.stats_events, self.stats_notes)
-        self.assertEqual(stats_events['tot_nb_events'], 8)
-        self.assertEqual(stats_events['no_charttime'], 1)
-        self.assertEqual(stats_events['no_value'], 1)
-        self.assertEqual(stats_events['incorrect_charttime'], 0)
-        self.assertEqual(stats_events['no_hadm_id_and_icustay_id'], 1)
-        self.assertEqual(stats_events['incorrect_hadm_id'], 1)
-        self.assertEqual(stats_events['incorrect_icustay_id'], 1)
-        self.assertEqual(stats_events['final_nb_events'], 3)
+        df_events, df_notes, stats = \
+                validate_events_and_notes_per_subject(self.df_admission,
+                self.df_events, self.df_notes, self.stats)
+        self.assertEqual(stats['events_tot_nb_events'], 8)
+        self.assertEqual(stats['events_no_charttime'], 1)
+        self.assertEqual(stats['events_no_value'], 1)
+        self.assertEqual(stats['events_incorrect_charttime'], 0)
+        self.assertEqual(stats['events_no_hadm_id_and_icustay_id'], 1)
+        self.assertEqual(stats['events_incorrect_hadm_id'], 1)
+        self.assertEqual(stats['events_incorrect_icustay_id'], 1)
+        self.assertEqual(stats['events_final_nb_events'], 3)
         self.assertEqual(len(df_events), 3)
         self.assertEqual(df_events.iloc[0]['HADM_ID'], 1.0)
         self.assertEqual(df_events.iloc[1]['HADM_ID'], 1.0)

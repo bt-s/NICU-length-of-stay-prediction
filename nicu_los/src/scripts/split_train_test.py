@@ -45,7 +45,7 @@ def move_to_directory(subjects_path, subject_directories, dir_name):
 
 def main(args):
     random.seed(21128947124)
-    verbose, subjects_path = args.verbose, args.subjects_path
+    subjects_path, verbose = args.subjects_path, args.verbose
     perc = args.training_percentage / 100
 
     subject_directories = os.listdir(subjects_path)
@@ -58,6 +58,10 @@ def main(args):
 
     train_directories = subject_directories[:split]
     test_directories = subject_directories[split:]
+
+    if verbose:
+        print(f'There are {len(train_directories)} train directories ' \
+                f'and {len(test_directories)} test directories.')
 
     # Create train and test directories
     move_to_directory(subjects_path, train_directories, 'train')

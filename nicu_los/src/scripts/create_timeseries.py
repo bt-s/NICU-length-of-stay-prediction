@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-"""create_timeseries.py
+"""createtime_series.py
 
 Script to create timeseries from preprocessed the clinical events tables
 """
@@ -15,9 +15,10 @@ import numpy as np
 from tqdm import tqdm
 from sys import argv
 
-from utils import round_up_to_hour, compute_ga_days_for_charttime, \
-        compute_remaining_los, los_hours_to_target, \
-        get_first_valid_value_from_ts, remove_subject_dir
+from ..utils.utils import round_up_to_hour, compute_ga_days_for_charttime, \
+        compute_remaining_los, get_subject_dirs, remove_subject_dir
+from ..utils.preprocessing_utils import los_hours_to_target, \
+        get_first_valid_value_from_ts
 
 
 def parse_cl_args():
@@ -25,8 +26,6 @@ def parse_cl_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('-sp', '--subjects-path', type=str, default='data/',
             help='Path to subject directories.')
-    parser.add_argument('-cp', '--config-path', type=str, default='config.json',
-            help='Path to the JSON configuration file.')
     parser.add_argument('-v', '--verbose', type=int,
             help='Level of verbosity in console output.', default=1)
 
@@ -93,33 +92,29 @@ def main(args):
     verbose, subjects_path = args.verbose, args.subjects_path
     removed_subjects, tot_events, tot_events_kept = 0, 0, 0
 
-    with open(args.config_path) as f:
+    with open('nicu_los/config.json') as f:
         config = json.load(f)
         variables = config['variables']
 
-    subject_directories = os.listdir(subjects_path)
-    subject_directories = set(filter(lambda x: str.isdigit(x),
-        subject_directories))
+    subject_directories = get_subject_dirs(subjects_path)
     tot_subjects = len(subject_directories)
 
     for i, subject_dir in enumerate(tqdm(subject_directories)):
         # Read the events dataframe
-        df_events = pd.read_csv(os.path.join(subjects_path, str(subject_dir),
-            'events.csv'))
+        df_events = pd.read_csv(os.path.join(subject_dir, 'events.csv'))
 
         # Read the admission dataframe
-        df_stay = pd.read_csv(os.path.join(subjects_path, str(subject_dir),
-            'stay.csv'))
+        df_stay = pd.read_csv(os.path.join(subject_dir, 'stay.csv'))
 
         # Create the timeseries
         df_ts = create_timeseries(variables, df_events, df_stay)
 
         # Write timeseries to timeseries.csv if not empty, remove otherwise
         if not df_ts.empty:
-            df_ts.to_csv(os.path.join(subjects_path, str(subject_dir),
-                'timeseries.csv'), index=False)
+            df_ts.to_csv(os.path.join(subject_dir, 'timeseries.csv'),
+                    index=False)
         else:
-            remove_subject_dir(os.path.join(subjects_path, str(subject_dir)))
+            remove_subject_dir(os.path.join(subject_dir))
             removed_subjects += 1
 
     if verbose:

@@ -18,8 +18,8 @@ import multiprocessing as mp
 
 from tqdm import tqdm
 
-from preprocessing_utils import clean_variables, remove_invalid_values
-from utils import remove_subject_dir
+from ..utils.preprocessing_utils import clean_variables, remove_invalid_values
+from ..utils.utils import get_subject_dirs, remove_subject_dir
 
 
 def parse_cl_args():
@@ -28,9 +28,8 @@ def parse_cl_args():
     parser.add_argument('-sp', '--subjects-path', type=str, default='data/',
             help='Path to subject directories.')
     parser.add_argument('-op', '--output-path', type=str,
-            default='variable_statistics.csv', help='Path to the output file.')
-    parser.add_argument('-cp', '--config-path', type=str, default='config.json',
-            help='Path to the JSON configuration file.')
+            default='logs/variable_statistics.csv',
+            help='Path to the output file.')
     parser.add_argument('-v', '--verbose', type=int,
             help='Level of verbosity in console output.', default=1)
 
@@ -40,15 +39,12 @@ def parse_cl_args():
 def main(args):
     subjects_path, verbose = args.subjects_path, args.verbose
 
-    with open(args.config_path) as f:
+    with open('nicu_los/config.json') as f:
         config = json.load(f)
         vars_to_itemid = config['vars_to_itemid']
         valid_ranges = config['valid_variable_ranges']
 
-    subject_directories = os.listdir(subjects_path)
-    subject_directories = set(filter(lambda x: str.isdigit(x),
-        subject_directories))
-
+    subject_directories = get_subject_dirs(subjects_path)
 
     if verbose: print("Filtering and cleaning selected variables...")
     tot_subjects = len(subject_directories)
@@ -75,12 +71,11 @@ def main(args):
 
     for i, subject_dir in enumerate(tqdm(subject_directories)):
         # Read the events dataframe
-        df_events = pd.read_csv(os.path.join(subjects_path, str(subject_dir),
-            'events.csv'))
+        df_events = pd.read_csv(os.path.join(subject_dir, 'events.csv'))
 
         tot_events += len(df_events)
 
-        # Filter the dataframe
+        # Filter the dataframe on the variables that we want to keep
         df_events = pd.merge(df_events, df_item_id, how='inner', on='ITEMID')
         df_events = df_events[df_events.VALUE.notnull()]
 
@@ -102,10 +97,10 @@ def main(args):
 
         # Write df_events to CSV
         if not df_events.empty:
-            df_events.to_csv(os.path.join(subjects_path, str(subject_dir),
-                'events.csv'), index=False)
+            df_events.to_csv(os.path.join(subject_dir, 'events.csv'),
+            index=False)
         else:
-            remove_subject_dir(os.path.join(subjects_path, str(subject_dir)))
+            remove_subject_dir(os.path.join(subject_dir))
             removed_subjects += 1
 
     # Write results to the file

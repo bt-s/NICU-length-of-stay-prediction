@@ -17,7 +17,7 @@ import multiprocessing as mp
 import pandas as pd
 import numpy as np
 
-from utils import get_subject_dirs
+from ..utils.utils import get_subject_dirs
 
 
 def parse_cl_args():
@@ -27,8 +27,6 @@ def parse_cl_args():
             help='Path to the train directories.')
     parser.add_argument('-tep', '--test-path', type=str, default='data/test/',
             help='Path to the testdirectories.')
-    parser.add_argument('-cp', '--config-path', type=str, default='config.json',
-            help='Path to the JSON configuration file.')
     parser.add_argument('-v', '--verbose', type=int,
             help='Level of verbosity in console output.', default=1)
 
@@ -60,7 +58,7 @@ def normalize(subject_dir, normalization_statistics, variables):
 
 
 def main(args):
-    with open(args.config_path) as f:
+    with open('nicu_los/config.json') as f:
         config = json.load(f)
         normalization_statistics = config['normalization_statistics']
         variables = config['variables']
