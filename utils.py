@@ -371,5 +371,28 @@ def istarmap(self, func, iterable, chunksize=1):
     return (item for chunk in result for item in chunk)
 
 
+def get_subject_dirs(path):
+    """Get subject directories from root path
+
+    Args:
+        path (str): Path to the directory containing all subject
+                    directories
+
+    Returns:
+        dir_paths(List[str]): List of subject directory paths
+    """
+    # Find the directories
+    dirs = os.listdir(path)
+
+    # Validate the directories
+    dirs = set(filter(lambda x: str.isdigit(x), dirs))
+
+    # Create a list of directory paths
+    dir_paths = [path + sd for sd in dirs]
+
+    return dir_paths
+
+
 mpp.Pool.istarmap = istarmap
+
 
