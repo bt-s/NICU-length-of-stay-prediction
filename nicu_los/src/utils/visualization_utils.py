@@ -38,7 +38,7 @@ def create_histogram(input_data, title='', rotation=0, fig_size=(12.376, 8), xla
 
     # Histogram of one data set
     if not isinstance(input_data[0], list):
-        max_val = max(input_data) + 1
+        max_val = int(max(input_data))
         plt.hist(input_data, max_val, density=normalize, alpha=alpha,
                 rwidth=rwidth, align='mid')
     # Histogram of multiple data sets

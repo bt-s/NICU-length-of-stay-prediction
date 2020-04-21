@@ -12,9 +12,11 @@ import csv, os, re
 import pandas as pd
 import numpy as np
 
+from scipy.stats import skew
 from tqdm import tqdm
 from word2number import w2n
 from datetime import datetime, timedelta
+
 from ..utils.reg_exps import reg_exps
 from ..utils.utils import remove_subject_dir
 
@@ -779,4 +781,75 @@ def validate_events_and_notes(subject_directories,
             f'{tot_subjects-removed_subjects} remain that have ' \
             'events associated with them.')
 
+
+def get_first(df):
+    return df.iloc[0]
+
+
+def get_last(df):
+    return df.iloc[-1]
+
+
+def get_subseq(df, perc_start, perc_end):
+    start = int(len(df) * perc_start/100)
+    end = int(len(df) * perc_end/100)
+
+    return df.iloc[start:end]
+
+
+def compute_statistics(subsequence, stat_fns):
+    return np.array([subsequence.apply(fn, axis=0) for fn in stat_fns],
+            dtype=np.float32)
+
+
+def get_subseq_stats(df, variables, stat_fns, sub_seqs=[]):
+    # Shape: # of subseqs, # of funcs times # of variables
+    X = np.zeros((len(sub_seqs), len(stat_fns)*len(variables)))
+    # Shape: # of subseqs
+    Y = np.zeros(len(sub_seqs))
+
+    x_old = np.zeros((len(stat_fns), len(variables)))
+    rows_to_delete = []
+    for i, (start_perc, end_perc) in enumerate(sub_seqs):
+        subseq = get_subseq(df, start_perc, end_perc)
+        # No statistics can be computed from an empty dataframe
+        if subseq.empty:
+            rows_to_delete.append(i)
+            continue
+
+        x = compute_statistics(subseq.loc[:, variables], stat_fns)
+
+        # Drop duplicate rows
+        if np.array_equal(x, x_old):
+            rows_to_delete.append(i)
+            continue
+
+        X[i, :] = x.flatten()
+        Y[i] = subseq.TARGET.iloc[-1]
+        x_old = x
+
+    X = np.delete(X, rows_to_delete, axis=0)
+    Y = np.delete(Y, rows_to_delete, axis=0)
+
+    return X, Y
+
+
+def baseline_features_targets(subject_dirs, variables, sub_seqs=[],
+        stat_fns=[]):
+    if not stat_fns:
+        stat_fns = [get_first, get_last, np.min, np.max, np.mean, np.median,
+                np.std, skew, len]
+
+    X = np.zeros((0, len(stat_fns)*len(variables)))
+    Y = np.zeros(0)
+    subject_ids = []
+    for sd in tqdm(subject_dirs):
+        ints_sd = [s for s in sd if s.isdigit()]
+        subject_ids.append(int(''.join(ints_sd)))
+        ts = pd.read_csv(os.path.join(sd, 'timeseries_imputed.csv'))
+        x, y = get_subseq_stats(ts, variables, stat_fns, sub_seqs)
+        X = np.concatenate((X, x), axis=0)
+        Y = np.concatenate((Y, y), axis=0)
+
+    return X, Y, subject_ids
 

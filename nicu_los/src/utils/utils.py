@@ -13,6 +13,19 @@ import datetime, os, re, shutil, time
 import multiprocessing.pool as mpp
 
 
+def get_date(s_date):
+    date_patterns = ["%Y-%m-%d", "%Y-%m-%d %H:%M:%S"]
+
+    for pattern in date_patterns:
+        try:
+            return datetime.datetime.strptime(s_date, pattern)
+        except:
+            pass
+
+    print(f'Date is not in expected format: {s_date}')
+    sys.exit(0)
+
+
 def round_up_to_hour(dt):
     """Round datetime up to hour
 
@@ -23,8 +36,7 @@ def round_up_to_hour(dt):
         dt (datetime.datetime/str): Datetime rounded up to hour
     """
     if type(dt) == str:
-        date_format = "%Y-%m-%d %H:%M:%S"
-        dt = datetime.datetime.strptime(dt, date_format)
+       dt = get_date(dt)
 
     hour = 3600
 

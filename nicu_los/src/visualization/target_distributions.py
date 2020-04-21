@@ -59,7 +59,6 @@ def main(args):
 
         # Read the timeseries dataframe
         ts = pd.read_csv(os.path.join(sd, 'timeseries.csv'))
-        ts.CHARTTIME = pd.to_datetime(ts.CHARTTIME)
         ts.CHARTTIME = ts.CHARTTIME.apply(lambda x: round_up_to_hour(x))
 
         # Compute the reamining LOS in hours for each charrtime
@@ -94,15 +93,16 @@ def main(args):
 
     # Create the buckets histogram
     create_histogram(input_data=[los_targets, los_remaining_targets],
-            xlabel='Buckets', ylabel='Frequency', rwidth=0.5, legend=['LOS',
-            'Remaining LOS'], xticks=xticks, save_plot=(os.path.join(
-            args.plots_path, 'normalized_frequency_of_the_target_buckets')))
+            xlabel='Buckets', ylabel='Frequency', rwidth=0.5,
+            legend=['LOS', 'Remaining LOS'], xticks=xticks,
+            save_plot=(os.path.join(args.plots_path,
+                'normalized_frequency_of_the_target_buckets')))
 
-    # Create the LOS hours histogram
+                # Create the LOS hours histogram
     create_histogram(input_data=[los_hours, los_remaining_hours],
-            xlabel='Hours', ylabel='Frequency', rwidth=1, legend=['LOS',
-            'Remaining LOS'], save_plot=(os.path.join(args.plots_path,
-            'normalized_frequency_of_the_LOS_in_hours')))
+            xlabel='Hours', ylabel='Frequency', rwidth=1,
+            legend=['LOS', 'Remaining LOS'], save_plot=(os.path.join(
+                args.plots_path, 'normalized_frequency_of_the_LOS_in_hours')))
 
 
 if __name__ == '__main__':

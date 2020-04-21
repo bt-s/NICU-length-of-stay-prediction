@@ -136,3 +136,4 @@ output*
 *.swp
 *.swo
 /plots/
+conda-env/
