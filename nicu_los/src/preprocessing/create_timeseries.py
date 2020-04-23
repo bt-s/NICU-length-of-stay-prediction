@@ -82,8 +82,9 @@ def create_timeseries(variables, df_events, df_stay, df_notes=None):
 
     # Add target LOS to timeseries
     los_hours = df_stay.iloc[0].LOS_HOURS
-    df_ts['TARGET'] = df_ts['CHARTTIME'].apply(lambda x:
-            los_hours_to_target(compute_remaining_los(x, intime, los_hours)))
+    df_ts['LOS_HOURS'] = df_ts['CHARTTIME'].apply(lambda x: compute_remaining_los(x, intime,
+        los_hours))
+    df_ts['TARGET'] = df_ts['LOS_HOURS'].apply(lambda x: los_hours_to_target(x))
 
     return df_ts
 
@@ -99,22 +100,21 @@ def main(args):
     subject_directories = get_subject_dirs(subjects_path)
     tot_subjects = len(subject_directories)
 
-    for i, subject_dir in enumerate(tqdm(subject_directories)):
+    for i, sd in enumerate(tqdm(subject_directories)):
         # Read the events dataframe
-        df_events = pd.read_csv(os.path.join(subject_dir, 'events.csv'))
+        df_events = pd.read_csv(os.path.join(sd, 'events.csv'))
 
         # Read the admission dataframe
-        df_stay = pd.read_csv(os.path.join(subject_dir, 'stay.csv'))
+        df_stay = pd.read_csv(os.path.join(sd, 'stay.csv'))
 
         # Create the timeseries
         df_ts = create_timeseries(variables, df_events, df_stay)
 
         # Write timeseries to timeseries.csv if not empty, remove otherwise
         if not df_ts.empty:
-            df_ts.to_csv(os.path.join(subject_dir, 'timeseries.csv'),
-                    index=False)
+            df_ts.to_csv(os.path.join(sd, 'timeseries.csv'), index=False)
         else:
-            remove_subject_dir(os.path.join(subject_dir))
+            remove_subject_dir(os.path.join(sd))
             removed_subjects += 1
 
     if verbose:

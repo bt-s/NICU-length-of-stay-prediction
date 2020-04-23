@@ -52,7 +52,7 @@ def impute(subject_dir, normal_values, method='ffill', mask=True):
         # Create an imputation mask
         ts_mask = ts.mask(ts.notna(), 1)
         ts_mask = ts_mask.mask(ts.isna(), 0)
-        ts_mask = ts_mask.drop(['TARGET'], axis=1)
+        ts_mask = ts_mask.drop(['LOS_HOURS', 'TARGET'], axis=1)
         ts_mask = ts_mask.add_prefix('mask_')
 
     # Make sure that the first row contains values such that we can

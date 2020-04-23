@@ -77,6 +77,9 @@ def compute_remaining_los(charttime, intime, los_hours_total):
     Returns:
         (int) Remaining LOS in hours
     """
+    if type(charttime) == str:
+       charttime = get_date(charttime)
+
     return round(los_hours_total - (charttime - intime) \
             .total_seconds() // 3600)
 
