@@ -137,3 +137,4 @@ output*
 *.swo
 /plots/
 conda-env/
+.conda*

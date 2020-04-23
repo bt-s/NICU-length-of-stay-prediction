@@ -12,7 +12,6 @@ import csv, os, re
 import pandas as pd
 import numpy as np
 
-from scipy.stats import skew
 from tqdm import tqdm
 from word2number import w2n
 from datetime import datetime, timedelta
@@ -799,57 +798,53 @@ def get_subseq(df, perc_start, perc_end):
 
 def compute_statistics(subsequence, stat_fns):
     return np.array([subsequence.apply(fn, axis=0) for fn in stat_fns],
-            dtype=np.float32)
+            dtype=np.float32).flatten()
 
 
 def get_subseq_stats(df, variables, stat_fns, sub_seqs=[]):
     # Shape: # of subseqs, # of funcs times # of variables
     X = np.zeros((len(sub_seqs), len(stat_fns)*len(variables)))
-    # Shape: # of subseqs
-    Y = np.zeros(len(sub_seqs))
 
-    x_old = np.zeros((len(stat_fns), len(variables)))
-    rows_to_delete = []
     for i, (start_perc, end_perc) in enumerate(sub_seqs):
         subseq = get_subseq(df, start_perc, end_perc)
         # No statistics can be computed from an empty dataframe
-        if subseq.empty:
-            rows_to_delete.append(i)
-            continue
+        if not subseq.empty:
+            X[i, :] = compute_statistics(subseq.loc[:, variables], stat_fns)
 
-        x = compute_statistics(subseq.loc[:, variables], stat_fns)
-
-        # Drop duplicate rows
-        if np.array_equal(x, x_old):
-            rows_to_delete.append(i)
-            continue
-
-        X[i, :] = x.flatten()
-        Y[i] = subseq.TARGET.iloc[-1]
-        x_old = x
-
-    X = np.delete(X, rows_to_delete, axis=0)
-    Y = np.delete(Y, rows_to_delete, axis=0)
-
-    return X, Y
+    return X.flatten()
 
 
-def baseline_features_targets(subject_dirs, variables, sub_seqs=[],
-        stat_fns=[]):
-    if not stat_fns:
-        stat_fns = [get_first, get_last, np.min, np.max, np.mean, np.median,
-                np.std, skew, len]
+def create_baseline_datasets_per_subject(sd, variables, stat_fns, sub_seqs):
+    ts = pd.read_csv(os.path.join(sd, 'timeseries_imputed.csv'))
+    y = ts.LOS_HOURS.to_numpy()
+    t = ts.TARGET.to_numpy()
 
-    X = np.zeros((0, len(stat_fns)*len(variables)))
-    Y = np.zeros(0)
-    subject_ids = []
-    for sd in tqdm(subject_dirs):
-        ints_sd = [s for s in sd if s.isdigit()]
-        subject_ids.append(int(''.join(ints_sd)))
-        ts = pd.read_csv(os.path.join(sd, 'timeseries_imputed.csv'))
-        x, y = get_subseq_stats(ts, variables, stat_fns, sub_seqs)
-        X = np.concatenate((X, x), axis=0)
-        Y = np.concatenate((Y, y), axis=0)
+    X = np.zeros((len(ts), len(stat_fns)*len(sub_seqs)*len(variables)))
 
-    return X, Y, subject_ids
+    for i in range(1, len(ts)):
+        X[i] = get_subseq_stats(ts[0:i], variables, stat_fns, sub_seqs)
+
+    return X, y, t
+
+
+def create_baseline_datasets(subject_directories, variables, stat_fns, sub_seqs):
+    tot_num_sub_seqs = 0
+    for i, sd in enumerate(tqdm(subject_directories)):
+        tot_num_sub_seqs += len(pd.read_csv(os.path.join(sd, 'timeseries_imputed.csv')))
+
+    X = np.zeros((tot_num_sub_seqs, len(stat_fns)*len(sub_seqs)*len(variables)))
+    y, t = np.zeros(tot_num_sub_seqs), np.zeros(tot_num_sub_seqs)
+
+    cnt = 0
+    for i, sd in enumerate(tqdm(subject_directories)):
+        cnt_old = cnt
+        x, yy, tt = create_baseline_datasets_per_subject(
+            sd, variables, stat_fns, sub_seqs)
+        cnt += len(yy)
+
+        X[cnt_old:cnt, :] = x
+        y[cnt_old:cnt] = yy
+        t[cnt_old:cnt] = tt
+
+    return X, y, t
 
