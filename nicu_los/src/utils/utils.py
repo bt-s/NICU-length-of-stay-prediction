@@ -8,7 +8,7 @@ As part of my Master's thesis at KTH Royal Institute of Technology.
 
 __author__ = "Bas Straathof"
 
-import datetime, os, re, shutil, time
+import datetime, os, re, shutil, time, tqdm
 
 import multiprocessing.pool as mpp
 
@@ -130,12 +130,14 @@ def istarmap(self, func, iterable, chunksize=1):
                 chunksize))
 
     task_batches = mpp.Pool._get_tasks(func, iterable, chunksize)
-    result = mpp.IMapIterator(self._cache)
+    result = mpp.IMapIterator(self)
     self._taskqueue.put((self._guarded_task_generation(result._job,
         mpp.starmapstar, task_batches),
         result._set_length))
 
     return (item for chunk in result for item in chunk)
+
+mpp.Pool.istarmap = istarmap
 
 
 def get_subject_dirs(path):
@@ -158,8 +160,4 @@ def get_subject_dirs(path):
     dir_paths = [path + sd for sd in dirs]
 
     return dir_paths
-
-
-mpp.Pool.istarmap = istarmap
-
 

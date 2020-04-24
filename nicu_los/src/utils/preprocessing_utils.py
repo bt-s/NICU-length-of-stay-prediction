@@ -7,7 +7,7 @@ Various functions to preprocess variables
 
 __author__ = "Bas Straathof"
 
-import csv, os, re
+import csv, os, re, sys
 
 import pandas as pd
 import numpy as np
@@ -16,8 +16,10 @@ from tqdm import tqdm
 from word2number import w2n
 from datetime import datetime, timedelta
 
+from sklearn.model_selection import train_test_split
+
 from ..utils.reg_exps import reg_exps
-from ..utils.utils import remove_subject_dir
+from ..utils.utils import remove_subject_dir, get_subject_dirs
 
 
 def clean_capillary_refill_rate(v):
@@ -847,4 +849,29 @@ def create_baseline_datasets(subject_directories, variables, stat_fns, sub_seqs)
         t[cnt_old:cnt] = tt
 
     return X, y, t
+
+
+def split_train_val(train_dirs_path, val_perc=0.2):
+    train_dirs = get_subject_dirs(train_dirs_path)
+
+    # Get two arrays: one of training targets and one of the
+    # corresponding subjects
+    targets_train = np.zeros(len(train_dirs))
+    subjects_train = np.zeros(len(train_dirs))
+    for i, sd in enumerate(train_dirs):
+        df_ts = pd.read_csv(os.path.join(sd, 'timeseries.csv'))
+        targets_train[i] = df_ts.TARGET.iloc[0]
+        subject_id = [int(s) for s in sd.split('/') if s.isdigit()][-1]
+        subjects_train[i] = subject_id
+
+    # Split the subjects list into training subjects list and a
+    # validation subjects list, in a stratified manner
+    subjects_train, subjects_val, _, _ = train_test_split(
+            subjects_train, targets_train, test_size=val_perc,
+            stratify=targets_train, shuffle=True)
+
+    train_dirs = [f'{train_dirs_path}/{int(i)}' for i in subjects_train]
+    val_dirs = [f'{train_dirs_path}/{int(i)}' for i in subjects_val]
+
+    return train_dirs, val_dirs
 

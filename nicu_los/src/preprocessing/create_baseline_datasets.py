@@ -18,10 +18,9 @@ from itertools import repeat
 
 from scipy.stats import skew
 from sklearn.preprocessing import StandardScaler
-from tqdm import tqdm
 
 from ..utils.preprocessing_utils import create_baseline_datasets, \
-        get_first, get_last
+        get_first, get_last, split_train_val
 from ..utils.utils import get_subject_dirs
 
 
@@ -40,13 +39,24 @@ def parse_cl_args():
 
 
 def main(args):
-    if not os.path.exists(args.baseline_data_path):
-        os.makedirs(args.baseline_data_path)
-        train_dirs = get_subject_dirs(os.path.join(args.subjects_path,
-            'train/'))
-        test_dirs = get_subject_dirs(os.path.join(args.subjects_path, 'test/'))
+    baseline_data_path = args.baseline_data_path
+    subjects_path = args.subjects_path
+    if not os.path.exists(baseline_data_path):
+        os.makedirs(baseline_data_path)
+        test_dirs = get_subject_dirs(os.path.join(subjects_path, 'test/'))
 
-        scaler = StandardScaler()
+        # Split the training directories into 80% training directories and
+        # 20% validation directories
+        train_dirs, val_dirs = split_train_val(os.path.join(subjects_path,
+            'train/'), val_perc=0.2)
+
+        # Write the training, validation and test subjects to files
+        with open(f'{baseline_data_path}/training_subjects.txt','w') as f:
+            f.write('\n'.join(train_dirs))
+        with open(f'{baseline_data_path}/validation_subjects.txt','w') as f:
+            f.write('\n'.join(val_dirs))
+        with open(f'{baseline_data_path}/test_subjects.txt','w') as f:
+            f.write('\n'.join(test_dirs))
 
         with open('nicu_los/config.json') as f:
             config = json.load(f)
@@ -61,11 +71,23 @@ def main(args):
                 train_dirs, variables, stat_fns, sub_seqs)
 
         # Normalize X_train
+        scaler = StandardScaler()
         X_train = scaler.fit_transform(X_train)
 
         np.save('data/baseline_features/X_train', X_train)
         np.save('data/baseline_features/y_train', y_train)
         np.save('data/baseline_features/t_train', t_train)
+
+        # Get validation features and targets
+        X_val, y_val, t_val  = create_baseline_datasets(
+                val_dirs, variables, stat_fns, sub_seqs)
+
+        # Normalize X_val
+        X_val = scaler.transform(X_val)
+
+        np.save('data/baseline_features/X_val', X_val)
+        np.save('data/baseline_features/y_val', y_val)
+        np.save('data/baseline_features/t_val', t_val)
 
         # Get test features and targets
         X_test, y_test, t_test  = create_baseline_datasets(
