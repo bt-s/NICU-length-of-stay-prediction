@@ -1,5 +1,6 @@
 #!/usr/bin/python3
-"""lr_baseline.py
+
+"""logistic_regression.py
 
 Script to create a Logistic Regression baseline.
 """
@@ -41,6 +42,8 @@ def parse_cl_args():
 def main(args):
     if not os.path.exists(args.models_path):
         os.makedirs(args.models_path)
+
+    v_print = print if args.verbose else lambda *a, **k: None
     data_path = args.baseline_data_path
     save_model = args.save_model
     now = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
@@ -60,7 +63,7 @@ def main(args):
 
     best_model, best_kappa = None, 0
     for (regularizer, C) in zip(regularizers, Cs):
-        print(f'Fitting LR model with penalty={regularizer} and C={C}')
+        v_print(f'Fitting LR model with penalty={regularizer} and C={C}')
         # Create Numpy arrays for storing the activations
         train_act = np.zeros(shape=y_train.shape, dtype=float)
         val_act = np.zeros(shape=y_val.shape, dtype=float)
@@ -71,10 +74,6 @@ def main(args):
 
         # Fit the model
         clf.fit(X_train, y_train)
-
-        # Predict on the training set
-        train_preds = clf.predict_proba(X_train)
-        train_act[:] = np.argmax(train_preds, axis=1)
 
         # Predict on the validation set
         val_preds = clf.predict_proba(X_val)

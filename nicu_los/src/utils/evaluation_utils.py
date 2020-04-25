@@ -8,6 +8,7 @@ Various functions to evaluate model performance.
 __author__ = "Bas Straathof"
 
 import matplotlib.pyplot as plt
+import numpy as np
 
 from sklearn.metrics import accuracy_score, cohen_kappa_score, f1_score, \
         mean_absolute_error, mean_squared_error, plot_confusion_matrix, \
@@ -40,15 +41,16 @@ def evaluate_classification_model(y_true, y_pred, verbose=1):
 def evaluate_regression_model(y_true, y_pred, verbose=1):
     mad = mean_absolute_error(y_true, y_pred)
     mse = mean_squared_error(y_true, y_pred)
+    rmse = np.sqrt(mse)
     mape = mean_absolute_perc_error(y_true, y_pred)
 
     if verbose:
         print(f'Mean Absolute Deviation (MAD): {mad}')
         print(f'Mean Squared Error (MSE): {mse}')
+        print(f'Root Mean Squared Error (RMSE): {rmse}')
         print(f'Mean Aboslute Perentage Error (MAPE): {mape}')
 
-    return {'mad': mad, 'mse': mse, 'mape': mape}
-
+    return {'mad': mad, 'mse': mse, 'rmse': rmse, 'mape': mape}
 
 
 def get_confusion_matrix(model, X, y, save_plot='', class_names=['0-1',
