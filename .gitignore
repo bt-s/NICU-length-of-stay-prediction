@@ -138,3 +138,4 @@ output*
 /plots/
 conda-env/
 .conda*
+/models/
