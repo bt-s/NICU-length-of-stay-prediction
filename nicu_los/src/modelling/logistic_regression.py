@@ -47,7 +47,7 @@ def main(args):
 
     # Get the data
     X_train, y_train, X_val, y_val, X_test, y_test = \
-            get_train_val_test_baseline_sets(data_path)
+            get_train_val_test_baseline_sets(data_path, task='classification')
 
     if args.grid_search:
         regularizers = ['l1', 'l1', 'l1', 'l1', 'l1', 'l2', 'l2', 'l2', 'l2',
