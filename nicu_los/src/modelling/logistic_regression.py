@@ -88,11 +88,11 @@ def main(args):
 
     # Predict on the training set
     train_preds = clf.predict_proba(X)
-    train_act[:] = np.argmax(train_preds, axis=1)
+    train_act = np.argmax(train_preds, axis=1)
 
     # Predict on the testing set
     test_preds = clf.predict_proba(X_test)
-    test_act[:] = np.argmax(test_preds, axis=1)
+    test_act = np.argmax(test_preds, axis=1)
 
     # Evaluate the model on the training set
     train_scores = evaluate_classification_model(y, train_act)
