@@ -79,7 +79,6 @@ def main(args):
     X_val = scaler.transform(X_val)
     X_test = scaler.transform(X_test)
 
-
     # The training and validation set need to be fed conjointly to GridSearchCV
     X = np.vstack((X_train, X_val))
     y = np.hstack((y_train, y_val))

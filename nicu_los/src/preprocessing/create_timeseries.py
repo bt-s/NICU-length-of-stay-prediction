@@ -82,8 +82,8 @@ def create_timeseries(variables, df_events, df_stay, df_notes=None):
 
     # Add target LOS to timeseries
     los_hours = df_stay.iloc[0].LOS_HOURS
-    df_ts['LOS_HOURS'] = df_ts['CHARTTIME'].apply(lambda x: compute_remaining_los(x, intime,
-        los_hours))
+    df_ts['LOS_HOURS'] = df_ts['CHARTTIME'].apply(lambda x: \
+            compute_remaining_los(x, intime, los_hours))
     df_ts['TARGET'] = df_ts['LOS_HOURS'].apply(lambda x: los_hours_to_target(x))
 
     return df_ts
