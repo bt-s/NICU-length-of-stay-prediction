@@ -816,8 +816,12 @@ def get_subseq_stats(df, variables, stat_fns, sub_seqs=[]):
     return X.flatten()
 
 
-def create_baseline_datasets_per_subject(sd, variables, stat_fns, sub_seqs):
-    ts = pd.read_csv(os.path.join(sd, 'timeseries_imputed.csv'))
+def create_baseline_datasets_per_subject(sd, variables, stat_fns, sub_seqs,
+        pre_imputed):
+    if pre_imputed:
+        ts = pd.read_csv(os.path.join(sd, 'timeseries_imputed.csv'))
+    else:
+        ts = pd.read_csv(os.path.join(sd, 'timeseries.csv'))
     y = ts.LOS_HOURS.to_numpy()
     t = ts.TARGET.to_numpy()
 
@@ -829,10 +833,18 @@ def create_baseline_datasets_per_subject(sd, variables, stat_fns, sub_seqs):
     return X, y, t
 
 
-def create_baseline_datasets(subject_directories, variables, stat_fns, sub_seqs):
+def create_baseline_datasets(subject_directories, variables, stat_fns, sub_seqs,
+        pre_imputed):
+
     tot_num_sub_seqs = 0
-    for i, sd in enumerate(tqdm(subject_directories)):
-        tot_num_sub_seqs += len(pd.read_csv(os.path.join(sd, 'timeseries_imputed.csv')))
+    if pre_imputed:
+        for i, sd in enumerate(tqdm(subject_directories)):
+            tot_num_sub_seqs += len(pd.read_csv(os.path.join(sd,
+                'timeseries_imputed.csv')))
+    else:
+        for i, sd in enumerate(tqdm(subject_directories)):
+            tot_num_sub_seqs += len(pd.read_csv(os.path.join(sd,
+                'timeseries.csv')))
 
     X = np.zeros((tot_num_sub_seqs, len(stat_fns)*len(sub_seqs)*len(variables)))
     y, t = np.zeros(tot_num_sub_seqs), np.zeros(tot_num_sub_seqs)
@@ -841,7 +853,7 @@ def create_baseline_datasets(subject_directories, variables, stat_fns, sub_seqs)
     for i, sd in enumerate(tqdm(subject_directories)):
         cnt_old = cnt
         x, yy, tt = create_baseline_datasets_per_subject(
-            sd, variables, stat_fns, sub_seqs)
+            sd, variables, stat_fns, sub_seqs, pre_imputed)
         cnt += len(yy)
 
         X[cnt_old:cnt, :] = x

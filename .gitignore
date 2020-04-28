@@ -139,3 +139,6 @@ output*
 conda-env/
 .conda*
 /models/
+.idea
+*.swp
+*.swn

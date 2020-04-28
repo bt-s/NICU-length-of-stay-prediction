@@ -77,7 +77,7 @@ def main(args):
 
     # Initialize the grid serach using the predefined train-validation split
     clf = GridSearchCV(LR, param_grid=param_grid, n_jobs=-1, cv=ps,
-    scoring=make_scorer(cohen_kappa_score), verbose=3)
+            scoring=make_scorer(cohen_kappa_score), verbose=3)
 
     # Fit the GridSearchCV to find the optimal estimator
     clf.fit(X, y)
