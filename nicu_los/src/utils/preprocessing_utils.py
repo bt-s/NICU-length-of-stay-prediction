@@ -816,8 +816,12 @@ def get_subseq_stats(df, variables, stat_fns, sub_seqs=[]):
     return X.flatten()
 
 
-def create_baseline_datasets_per_subject(sd, variables, stat_fns, sub_seqs):
-    ts = pd.read_csv(os.path.join(sd, 'timeseries_imputed.csv'))
+def create_baseline_datasets_per_subject(sd, variables, stat_fns, sub_seqs,
+        pre_imputed):
+    if pre_imputed:
+        ts = pd.read_csv(os.path.join(sd, 'timeseries_imputed.csv'))
+    else:
+        ts = pd.read_csv(os.path.join(sd, 'timeseries.csv'))
     y = ts.LOS_HOURS.to_numpy()
     t = ts.TARGET.to_numpy()
 
@@ -826,29 +830,9 @@ def create_baseline_datasets_per_subject(sd, variables, stat_fns, sub_seqs):
     for i in range(1, len(ts)):
         X[i] = get_subseq_stats(ts[0:i], variables, stat_fns, sub_seqs)
 
-    return X, y, t
-
-
-def create_baseline_datasets(subject_directories, variables, stat_fns, sub_seqs):
-    tot_num_sub_seqs = 0
-    for i, sd in enumerate(tqdm(subject_directories)):
-        tot_num_sub_seqs += len(pd.read_csv(os.path.join(sd, 'timeseries_imputed.csv')))
-
-    X = np.zeros((tot_num_sub_seqs, len(stat_fns)*len(sub_seqs)*len(variables)))
-    y, t = np.zeros(tot_num_sub_seqs), np.zeros(tot_num_sub_seqs)
-
-    cnt = 0
-    for i, sd in enumerate(tqdm(subject_directories)):
-        cnt_old = cnt
-        x, yy, tt = create_baseline_datasets_per_subject(
-            sd, variables, stat_fns, sub_seqs)
-        cnt += len(yy)
-
-        X[cnt_old:cnt, :] = x
-        y[cnt_old:cnt] = yy
-        t[cnt_old:cnt] = tt
-
-    return X, y, t
+    np.save(f'{sd}/X_baseline', X)
+    np.save(f'{sd}/y_baseline', y)
+    np.save(f'{sd}/t_baseline', t)
 
 
 def split_train_val(train_dirs_path, val_perc=0.2):
