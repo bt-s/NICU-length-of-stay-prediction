@@ -97,10 +97,10 @@ def main(args):
         config = json.load(f)
         variables = config['variables']
 
-    subject_directories = get_subject_dirs(subjects_path)
-    tot_subjects = len(subject_directories)
+    subject_dirs = get_subject_dirs(subjects_path)
+    tot_subjects = len(subject_dirs)
 
-    for i, sd in enumerate(tqdm(subject_directories)):
+    for i, sd in enumerate(tqdm(subject_dirs)):
         # Read the events dataframe
         df_events = pd.read_csv(os.path.join(sd, 'events.csv'))
 

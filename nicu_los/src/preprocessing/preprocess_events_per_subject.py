@@ -44,10 +44,10 @@ def main(args):
         vars_to_itemid = config['vars_to_itemid']
         valid_ranges = config['valid_variable_ranges']
 
-    subject_directories = get_subject_dirs(subjects_path)
+    subject_dirs = get_subject_dirs(subjects_path)
 
     if verbose: print("Filtering and cleaning selected variables...")
-    tot_subjects = len(subject_directories)
+    tot_subjects = len(subject_dirs)
     removed_subjects, tot_events, tot_events_kept = 0, 0, 0
 
     # Create item_id to var dictionary based on vars_to_itemid
@@ -69,9 +69,9 @@ def main(args):
         variable_counts[var] = {'VALUES': [], 'SUBJECTS': 0,
                 'INVALID_VALUES': 0}
 
-    for i, subject_dir in enumerate(tqdm(subject_directories)):
+    for i, sd in enumerate(tqdm(subject_dirs)):
         # Read the events dataframe
-        df_events = pd.read_csv(os.path.join(subject_dir, 'events.csv'))
+        df_events = pd.read_csv(os.path.join(sd, 'events.csv'))
 
         tot_events += len(df_events)
 
@@ -97,10 +97,10 @@ def main(args):
 
         # Write df_events to CSV
         if not df_events.empty:
-            df_events.to_csv(os.path.join(subject_dir, 'events.csv'),
+            df_events.to_csv(os.path.join(sd, 'events.csv'),
             index=False)
         else:
-            remove_subject_dir(os.path.join(subject_dir))
+            remove_subject_dir(os.path.join(sd))
             removed_subjects += 1
 
     # Write results to the file

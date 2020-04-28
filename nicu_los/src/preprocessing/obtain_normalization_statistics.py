@@ -33,7 +33,7 @@ def parse_cl_args():
 def main(args):
     train_path = args.train_path
 
-    train_directories = get_subject_dirs(train_path)
+    train_dirs = get_subject_dirs(train_path)
 
     with open('nicu_los/config.json', 'r') as f:
         config = json.load(f)
@@ -42,7 +42,7 @@ def main(args):
     for var in variables:
         values = []
         print(f"Finding the mean and the standard deviation of {var}...")
-        for subject_dir in tqdm(train_directories):
+        for subject_dir in tqdm(train_dirs):
             # Read the timeseries dataframe
             df_ts = pd.read_csv(os.path.join(subject_dir,
                 'timeseries_imputed.csv'))

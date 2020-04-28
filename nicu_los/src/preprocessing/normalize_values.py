@@ -33,18 +33,18 @@ def parse_cl_args():
     return parser.parse_args(argv[1:])
 
 
-def normalize(subject_dir, normalization_statistics, variables):
+def normalize(sd, normalization_statistics, variables):
     """Normalize a timeseries corresponding to a subject
 
     Args:
-        subject_dir (str): Path to the subject directory
+        sd (str): Path to the subject directory
         normalization_statistics (dict): Dictionary containing the means and
                                          standard deviations of the variables
                                          of interest
         variables (list): List of variables of interest
     """
     # Read the timeseries dataframe
-    ts = pd.read_csv(os.path.join(subject_dir, 'timeseries_imputed.csv'))
+    ts = pd.read_csv(os.path.join(sd, 'timeseries_imputed.csv'))
     ts = ts.set_index('CHARTTIME')
 
     for var in variables:
@@ -54,7 +54,7 @@ def normalize(subject_dir, normalization_statistics, variables):
         ts[var] = ts[var].apply(lambda x: (x - mean) / stdev)
 
     # Write the timeseries to CSV
-    ts.to_csv(os.path.join(subject_dir, 'timeseries_normalized.csv'))
+    ts.to_csv(os.path.join(sd, 'timeseries_normalized.csv'))
 
 
 def main(args):
@@ -63,14 +63,14 @@ def main(args):
         normalization_statistics = config['normalization_statistics']
         variables = config['variables']
 
-    train_directories = get_subject_dirs(args.train_path)
-    test_directories = get_subject_dirs(args.test_path)
-    all_directories = train_directories + test_directories
+    train_dirs = get_subject_dirs(args.train_path)
+    test_dirs = get_subject_dirs(args.test_path)
+    all_dirs = train_dirs + test_dirs
 
     with mp.Pool() as pool:
-        for _ in tqdm(pool.istarmap(normalize, zip(all_directories,
+        for _ in tqdm(pool.istarmap(normalize, zip(all_dirs,
             repeat(normalization_statistics), repeat(variables))),
-            total=len(all_directories)):
+            total=len(all_dirs)):
             pass
 
 

@@ -25,21 +25,21 @@ def parse_cl_args():
     return parser.parse_args(argv[1:])
 
 
-def move_to_directory(subjects_path, subject_directories, dir_name):
+def move_to_directory(subjects_path, subject_dirs, dir_name):
     """Move subjects to train/test directory
 
     Args:
         subjects_path (str): Path to the subject directories
-        subject_directories (list): List of subject directories
+        subject_dirs (list): List of subject directories
         dir_name (str): Name of split directory (train/test)
     """
     path = os.path.join(subjects_path, dir_name)
     if not os.path.exists(path):
         os.makedirs(path)
 
-    for subject_dir in subject_directories:
-        src = os.path.join(subjects_path, subject_dir)
-        dest = os.path.join(subjects_path, dir_name,  subject_dir)
+    for sd in subject_dirs:
+        src = os.path.join(subjects_path, sd)
+        dest = os.path.join(subjects_path, dir_name,  sd)
         shutil.move(src, dest)
 
 
@@ -48,24 +48,24 @@ def main(args):
     subjects_path, verbose = args.subjects_path, args.verbose
     perc = args.training_percentage / 100
 
-    subject_directories = os.listdir(subjects_path)
-    subject_directories = list(set(filter(lambda x: str.isdigit(x),
-        subject_directories)))
-    tot_directories = len(subject_directories)
-    split = round(tot_directories*perc)
+    subject_dirs = os.listdir(subjects_path)
+    subject_dirs = list(set(filter(lambda x: str.isdigit(x),
+        subject_dirs)))
+    tot_dirs = len(subject_dirs)
+    split = round(tot_dirs*perc)
 
-    random.shuffle(subject_directories)
+    random.shuffle(subject_dirs)
 
-    train_directories = subject_directories[:split]
-    test_directories = subject_directories[split:]
+    train_dirs = subject_dirs[:split]
+    test_dirs = subject_dirs[split:]
 
     if verbose:
-        print(f'There are {len(train_directories)} train directories ' \
-                f'and {len(test_directories)} test directories.')
+        print(f'There are {len(train_dirs)} train directories ' \
+                f'and {len(test_dirs)} test directories.')
 
     # Create train and test directories
-    move_to_directory(subjects_path, train_directories, 'train')
-    move_to_directory(subjects_path, test_directories, 'test')
+    move_to_directory(subjects_path, train_dirs, 'train')
+    move_to_directory(subjects_path, test_dirs, 'test')
 
 if __name__ == '__main__':
     main(parse_cl_args())
