@@ -15,22 +15,26 @@ from sys import argv
 from datetime import datetime
 
 from sklearn.linear_model import LogisticRegression
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import GridSearchCV, PredefinedSplit
 from sklearn.metrics import make_scorer, cohen_kappa_score
 
 from ..utils.evaluation_utils import evaluate_classification_model
-from ..utils.modelling_utils import get_train_val_test_baseline_sets
+from ..utils.modelling_utils import get_baseline_datasets
 
 
 def parse_cl_args():
     """Parses CL arguments"""
     parser = argparse.ArgumentParser()
-    parser.add_argument('-sp', '--baseline-data-path', type=str,
-            default='data/baseline_features/',
-            help='Path to baseline features directories.')
+    parser.add_argument('-sp', '--subjects-path', type=str,
+            default='data/',
+            help='Path to the subjects directories.')
     parser.add_argument('-mp', '--models-path', type=str,
             default='models/logistic_regression/',
             help='Path to the models directory.')
+    parser.add_argument('-pi', '--pre-imputed', type=int, default=0,
+            help='Whether to use pre-imputed time-series.')
     parser.add_argument('-sm', '--save-model', type=bool, default=True,
             help='Whether to save the model.')
     parser.add_argument('-gs', '--grid-search', type=bool, default=False,
@@ -45,13 +49,36 @@ def main(args):
     if not os.path.exists(args.models_path):
         os.makedirs(args.models_path)
 
-    data_path = args.baseline_data_path
+    data_path = args.subjects_path
     save_model = args.save_model
+    pre_imputed = args.pre_imputed
     now = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
 
+    with open(f'{data_path}/training_subjects.txt', 'r') as f:
+        train_dirs = f.read().splitlines()
+    with open(f'{data_path}/validation_subjects.txt', 'r') as f:
+        val_dirs = f.read().splitlines()
+    with open(f'{data_path}/test_subjects.txt', 'r') as f:
+        test_dirs = f.read().splitlines()
+
     # Get the data
-    X_train, y_train, X_val, y_val, X_test, y_test = \
-            get_train_val_test_baseline_sets(data_path, task='classification')
+    X_train, _, y_train = get_baseline_datasets(train_dirs[:4])
+    X_val, _, y_val = get_baseline_datasets(val_dirs[:4])
+    X_test, _, y_test = get_baseline_datasets(test_dirs[:4])
+
+    if not pre_imputed:
+        imputer = SimpleImputer(missing_values=np.nan, strategy='mean',
+                fill_value='constant', verbose=0, copy=True)
+        X_train = imputer.fit_transform(X_train)
+        X_val = imputer.transform(X_val)
+        X_test = imputer.transform(X_test)
+
+    # Normalize
+    scaler = StandardScaler()
+    X_train = scaler.fit_transform(X_train)
+    X_val = scaler.transform(X_val)
+    X_test = scaler.transform(X_test)
+
 
     # The training and validation set need to be fed conjointly to GridSearchCV
     X = np.vstack((X_train, X_val))
