@@ -73,7 +73,8 @@ def main(args):
         sub_seqs = config['baseline_subsequences']
 
     # Functions to compute statistical features
-    stat_fns = [np.min, np.max, np.mean, np.std, skew, len]
+    stat_fns = [get_first, get_last, np.min, np.max, np.mean, np.std, skew,
+            len]
 
     subject_dirs = train_dirs + val_dirs + test_dirs
 

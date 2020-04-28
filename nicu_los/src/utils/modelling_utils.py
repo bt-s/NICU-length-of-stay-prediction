@@ -22,7 +22,7 @@ def get_baseline_datasets(subject_dirs):
         tot_num_sub_seqs += len(pd.read_csv(os.path.join(sd,
             'timeseries.csv')))
 
-    X = np.zeros((tot_num_sub_seqs, 588))
+    X = np.zeros((tot_num_sub_seqs, 756))
     y, t = np.zeros(tot_num_sub_seqs), np.zeros(tot_num_sub_seqs)
 
     cnt = 0

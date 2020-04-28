@@ -62,9 +62,9 @@ def main(args):
         test_dirs = f.read().splitlines()
 
     # Get the data
-    X_train, _, y_train = get_baseline_datasets(train_dirs[:4])
-    X_val, _, y_val = get_baseline_datasets(val_dirs[:4])
-    X_test, _, y_test = get_baseline_datasets(test_dirs[:4])
+    X_train, _, y_train = get_baseline_datasets(train_dirs)
+    X_val, _, y_val = get_baseline_datasets(val_dirs)
+    X_test, _, y_test = get_baseline_datasets(test_dirs)
 
     if not pre_imputed:
         imputer = SimpleImputer(missing_values=np.nan, strategy='mean',
