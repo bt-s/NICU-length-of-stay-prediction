@@ -17,20 +17,16 @@ import multiprocessing as mp
 from itertools import repeat
 
 from scipy.stats import skew
-from sklearn.preprocessing import StandardScaler
-from sklearn.impute import SimpleImputer
+from tqdm import tqdm
 
-from ..utils.preprocessing_utils import create_baseline_datasets, \
-        get_first, get_last, split_train_val
+from ..utils.preprocessing_utils import get_first, get_last, split_train_val, \
+        create_baseline_datasets_per_subject
 from ..utils.utils import get_subject_dirs
 
 
 def parse_cl_args():
     """Parses CL arguments"""
     parser = argparse.ArgumentParser()
-    parser.add_argument('-bp', '--baseline-data-path', type=str,
-            default='data/baseline_features/',
-            help='Path to the baseline data sets.')
     parser.add_argument('-sp', '--subjects-path', type=str, default='data/',
             help='Path to subject directories.')
     parser.add_argument('-pi', '--pre-imputed', type=int, default=0,
@@ -42,17 +38,13 @@ def parse_cl_args():
 
 
 def main(args):
-    baseline_data_path = args.baseline_data_path
     subjects_path = args.subjects_path
     pre_imputed = args.pre_imputed
 
-    if not os.path.exists(baseline_data_path):
-        os.makedirs(baseline_data_path)
-
-    train_sub_path = os.path.join(baseline_data_path, 'training_subjects.txt')
-    val_sub_path = os.path.join(baseline_data_path,
+    train_sub_path = os.path.join(subjects_path, 'training_subjects.txt')
+    val_sub_path = os.path.join(subjects_path,
             'validation_subjects.txt')
-    test_sub_path = os.path.join(baseline_data_path, 'test_subjects.txt')
+    test_sub_path = os.path.join(subjects_path, 'test_subjects.txt')
 
     if os.path.exists(train_sub_path) and os.path.exists(val_sub_path) \
             and os.path.exists(test_sub_path):
@@ -75,8 +67,7 @@ def main(args):
         with open(val_sub_path,'w') as f: f.write('\n'.join(val_dirs))
         with open(test_sub_path,'w') as f: f.write('\n'.join(test_dirs))
 
-
-    with open('../../config.json') as f:
+    with open('nicu_los/config.json') as f:
         config = json.load(f)
         variables = config['variables']
         sub_seqs = config['baseline_subsequences']
@@ -84,54 +75,13 @@ def main(args):
     # Functions to compute statistical features
     stat_fns = [np.min, np.max, np.mean, np.std, skew, len]
 
-    # Get training features and targets
-    X_train, y_train, t_train = create_baseline_datasets(train_dirs,
-            variables, stat_fns, sub_seqs, pre_imputed)
+    subject_dirs = train_dirs + val_dirs + test_dirs
 
-    if not pre_imputed:
-        imputer = SimpleImputer(missing_values=np.nan, strategy='mean',
-                fill_value='constant', verbose=0, copy=True)
-        imputer.fit(X_train)
-        X_train = imputer.transform(X_train)
-
-    # Normalize X_train
-    scaler = StandardScaler()
-    scaler.fit(X_train)
-    X_train = scaler.transform(X_train)
-    test = 0
-    np.save('data/baseline_features/X_train', X_train)
-    np.save('data/baseline_features/y_train', y_train)
-    np.save('data/baseline_features/t_train', t_train)
-
-    # Get validation features and targets
-    X_val, y_val, t_val  = create_baseline_datasets(val_dirs, variables,
-            stat_fns, sub_seqs, pre_imputed)
-
-    if not pre_imputed:
-        # Impute X_val
-        X_val = imputer.transform(X_val)
-
-    # Normalize X_val
-    X_val = scaler.transform(X_val)
-
-    np.save('data/baseline_features/X_val', X_val)
-    np.save('data/baseline_features/y_val', y_val)
-    np.save('data/baseline_features/t_val', t_val)
-
-    # Get test features and targets
-    X_test, y_test, t_test  = create_baseline_datasets(test_dirs,
-            variables, stat_fns, sub_seqs, pre_imputed)
-
-    if not pre_imputed:
-        # Impute X_test
-        X_test = imputer.transform(X_test)
-
-    # Normalize X_test
-    X_test = scaler.transform(X_test)
-
-    np.save('data/baseline_features/X_test', X_test)
-    np.save('data/baseline_features/y_test', y_test)
-    np.save('data/baseline_features/t_test', t_test)
+    with mp.Pool() as pool:
+        for _ in tqdm(pool.istarmap(create_baseline_datasets_per_subject,
+            zip(subject_dirs, repeat(variables), repeat(stat_fns),
+                repeat(sub_seqs), repeat(pre_imputed)))):
+            pass
 
 
 if __name__ == '__main__':
