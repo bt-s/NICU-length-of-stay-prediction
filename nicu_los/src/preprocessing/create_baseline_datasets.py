@@ -71,10 +71,8 @@ def main(args):
         config = json.load(f)
         variables = config['variables']
         sub_seqs = config['baseline_subsequences']
-
-    # Functions to compute statistical features
-    stat_fns = [get_first, get_last, np.min, np.max, np.mean, np.std, skew,
-            len]
+        stat_fns = config['stat_fns']
+        stat_fns = [eval(x) for x in stat_fns]
 
     subject_dirs = train_dirs + val_dirs + test_dirs
 

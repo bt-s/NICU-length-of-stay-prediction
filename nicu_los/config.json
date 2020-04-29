@@ -153,5 +153,7 @@
   },
   "baseline_subsequences": [
     [0, 10], [0, 25], [0, 50], [0, 100], [50, 100], [75, 100], [90, 100]
-  ]
+  ],
+  "stat_fns": ["get_first", "get_last", "np.min", "np.max", "np.mean", "np.std",
+	  "skew", "len"]
 }

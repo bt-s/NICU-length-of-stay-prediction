@@ -22,7 +22,16 @@ def get_baseline_datasets(subject_dirs):
         tot_num_sub_seqs += len(pd.read_csv(os.path.join(sd,
             'timeseries.csv')))
 
-    X = np.zeros((tot_num_sub_seqs, 756))
+    with open('nicu_los/config.json') as f:
+        config = json.load(f)
+        variables = config['variables']
+        sub_seqs = config['baseline_subsequences']
+        stat_fns = config['stat_fns']
+
+        # Add the masks
+        variables = ['mask_' + v for v in variables]
+
+    X = np.zeros((tot_num_sub_seqs, len(variables)*len(sub_seqs)*len(stat_fns)))
     y, t = np.zeros(tot_num_sub_seqs), np.zeros(tot_num_sub_seqs)
 
     cnt = 0
@@ -39,6 +48,7 @@ def get_baseline_datasets(subject_dirs):
         t[cnt_old:cnt] = tt
 
     return X, y, t
+
 
 def get_train_val_test_baseline_sets(data_path, task):
     with open(os.path.join(data_path, 'training_subjects.txt'), 'r') as f:
@@ -75,6 +85,8 @@ def get_train_val_test_data(data_path, task):
     with open('nicu_los/config.json') as f:
         config = json.load(f)
         variables = config['variables']
+        sub_seqs = config['baseline_subsequences']
+        stat_fns = config['stat_fns']
 
         # Add the masks
         variables = ['mask_' + v for v in variables]
