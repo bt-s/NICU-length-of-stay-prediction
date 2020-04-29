@@ -86,7 +86,7 @@ def main(args):
 
     # Predict on the training set
     train_preds = clf.predict(X_train)
-    train_preds = np.clip(train_preds, np.min(y_train), np.max(y_train))
+    train_preds = np.maximum(train_preds, np.min(y_train))
     # Evaluate the model on the test set
     v_print('Evaluate on the training set')
     train_scores = evaluate_regression_model(y_train, train_preds)
