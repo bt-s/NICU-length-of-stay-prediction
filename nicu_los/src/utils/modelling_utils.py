@@ -234,3 +234,12 @@ def data_generator(list_file, steps, batch_size, task='classification',
                     yield x, y
                 else:
                     yield x, t
+
+
+def create_list_file(subject_dirs, list_file_path,
+        ts_fname='timeseries_normalized.csv'):
+    with open(list_file_path, 'a') as f:
+        for i, sd in enumerate(tqdm(subject_dirs)):
+            ts = pd.read_csv(os.path.join(sd, ts_fname))
+            for row in range(1, len(ts)+1):
+                f.write(f'{sd}, {row}\n')
