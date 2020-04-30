@@ -88,7 +88,8 @@ def main(args):
         # Construct the model
         model = construct_simple_lstm()
         if args.checkpoint_file:
-            model.load_weights(os.path.join(checkpoints_dir, args.checkpoint_file))
+        model.load_weights(os.path.join(checkpoints_dir,
+            args.checkpoint_file))
 
         # Compile the model
         model.compile(
