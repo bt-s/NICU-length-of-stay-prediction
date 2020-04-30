@@ -14,6 +14,9 @@ import numpy as np
 
 from tqdm import tqdm
 
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Dense, Dropout, Input, LSTM
+
 from ..utils.utils import get_subject_dirs
 
 
@@ -165,4 +168,25 @@ class TimeSeriesReader(object):
             self.current_index = 0
 
         return self.read_sequence(self.current_index)
+
+
+def construct_simple_lstm(input_dimension=28, dropout=0.3, hid_dimension=64,
+        is_bidirectional=True):
+    X = Input(shape=(None, input_dimension))
+    inputs = [X]
+
+    num_hid_units = hid_dimension
+
+    X = LSTM(activation='tanh', dropout=dropout,
+            recurrent_dropout=dropout,
+            return_sequences=False,
+            units=num_hid_units)(inputs)
+
+    if dropout > 0:
+        X = Dropout(dropout)(X)
+
+    y = Dense(units=10, activation='softmax')(X)
+    outputs = [y]
+
+    return Model(inputs=inputs, outputs=outputs, name='simple_lstm')
 
