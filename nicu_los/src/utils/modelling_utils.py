@@ -14,6 +14,7 @@ import numpy as np
 
 from tqdm import tqdm
 
+import tensorflow as tf
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Dense, Dropout, Input, LSTM
 
@@ -190,3 +191,46 @@ def construct_simple_lstm(input_dimension=28, dropout=0.3, hid_dimension=64,
 
     return Model(inputs=inputs, outputs=outputs, name='simple_lstm')
 
+
+
+def get_bucket_by_seq_len(batch_size):
+    def element_length_fn(x, y):
+        return tf.shape(x)[0]
+
+    bucket_boundaries = [8, 16, 32, 48, 64, 96, 128, 176, 256, 384, 512, 768,
+            1280, 2048]
+    bucket_batch_sizes = [batch_size for x in range(len(bucket_boundaries) + 1)]
+
+    # Sequences require the same length per batch
+    bucket_by_seq_len = tf.data.experimental.bucket_by_sequence_length(
+            element_length_fn, bucket_boundaries, bucket_batch_sizes,
+            drop_remainder=True)
+
+    return bucket_by_seq_len
+
+
+def data_generator(list_file, steps, batch_size, task='classification',
+        mask=True, shuffle=True):
+    reader = TimeSeriesReader(list_file, mask=mask)
+
+    chunk_size = steps*batch_size
+
+    while True:
+        if shuffle: reader.random_shuffle(seed=42)
+
+        remaining = chunk_size
+
+        while remaining > 0:
+            current_size = min(chunk_size, remaining)
+            remaining -= current_size
+
+            data = reader.read_chunk(current_size)
+            Xs = data['X']
+            ys = data['y']
+            ts = data['t']
+
+            for x, y, t in zip(Xs, ys, ts):
+                if task == 'regression':
+                    yield x, y
+                else:
+                    yield x, t
