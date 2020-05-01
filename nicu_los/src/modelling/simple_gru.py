@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-"""simple_lstm.py
+"""simple_gru.py
 
 Implementation of a simple LSTM model to predict the remaining length-of-stay.
 """
@@ -19,7 +19,7 @@ from datetime import datetime
 import numpy as np
 
 from ..utils.modelling_utils import create_list_file, data_generator, \
-        get_bucket_by_seq_len, construct_simple_lstm
+        get_bucket_by_seq_len, construct_simple_gru
 from ..utils.evaluation_utils import evaluate_classification_model
 
 
@@ -29,7 +29,7 @@ def parse_cl_args():
     parser.add_argument('--data-path', type=str, default='data',
             help='Path to the data directories.')
     parser.add_argument( '--models-path', type=str,
-            default='models/simple_lstm',
+            default='models/simple_gru',
             help='Path to the simple LSTM models directory.')
     parser.add_argument('--batch-size', type=int, default=8, help='Batch size.')
     parser.add_argument('--mask-indicator', type=int, default=1,
@@ -94,7 +94,7 @@ def main(args):
 
     #with strategy.scope():
     # Construct the model
-    model = construct_simple_lstm()
+    model = construct_simple_gru()
     if args.checkpoint_file:
         model.load_weights(os.path.join(checkpoints_dir,
             args.checkpoint_file))
