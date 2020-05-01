@@ -16,9 +16,11 @@ from tensorflow.keras.losses import SparseCategoricalCrossentropy
 import argparse, json, os
 from sys import argv
 from datetime import datetime
+import numpy as np
 
 from ..utils.modelling_utils import create_list_file, data_generator, \
         get_bucket_by_seq_len, construct_simple_lstm
+from ..utils.evaluation_utils import evaluate_classification_model
 
 
 def parse_cl_args():
@@ -38,7 +40,7 @@ def parse_cl_args():
             help='Validation steps per epoch.')
     parser.add_argument('--epochs', type=int, default=100,
             help='Epochs.')
-    parser.add_argument('--training', type=bool, default=True,
+    parser.add_argument('--training', type=bool, default=False,
             help='Whether the current phase is the training phase.')
     parser.add_argument('--checkpoint-file', type=str, default="",
             help='File from which to load the model weights.')
@@ -49,8 +51,8 @@ def parse_cl_args():
 
 
 def main(args):
-    strategy = tf.distribute.MirroredStrategy(devices=["/gpu:0",
-        "/gpu:1"])
+    #strategy = tf.distribute.MirroredStrategy(devices=["/gpu:0",
+        #"/gpu:1"])
 
     data_path = args.data_path
     models_path = args.models_path
@@ -84,20 +86,20 @@ def main(args):
         if mask:
             variables = variables + ['mask_' + v for v in variables]
 
-    with strategy.scope():
-        # Construct the model
-        model = construct_simple_lstm()
-        if args.checkpoint_file:
+    #with strategy.scope():
+    # Construct the model
+    model = construct_simple_lstm()
+    if args.checkpoint_file:
         model.load_weights(os.path.join(checkpoints_dir,
             args.checkpoint_file))
 
-        # Compile the model
-        model.compile(
-                optimizer=Adam(),
-                loss=SparseCategoricalCrossentropy(),
-                metrics=['accuracy'])
+    # Compile the model
+    model.compile(
+            optimizer=Adam(),
+            loss=SparseCategoricalCrossentropy(),
+            metrics=['accuracy'])
 
-        model.summary()
+    model.summary()
 
     if training:
         train_list_file = os.path.join(data_path, 'train_list.txt')
@@ -106,8 +108,7 @@ def main(args):
         if not os.path.exists(train_list_file):
             with open(f'{data_path}/training_subjects.txt', 'r') as f:
                 train_dirs = f.read().splitlines()
-
-            create_list_file(train_dirs, train_list_file)
+                create_list_file(train_dirs, train_list_file)
 
         if not os.path.exists(val_list_file):
             with open(f'{data_path}/validation_subjects.txt', 'r') as f:
@@ -147,6 +148,32 @@ def main(args):
             steps_per_epoch=training_steps,
             validation_steps=validation_steps,
             callbacks=callbacks)
+
+    else:
+        test_list_file = os.path.join(data_path, 'test_list.txt')
+
+        if not os.path.exists(test_list_file):
+            with open(f'{data_path}/test_subjects.txt', 'r') as f:
+                test_dirs = f.read().splitlines()
+                create_list_file(test_dirs, test_list_file)
+
+        test_data = tf.data.Dataset.from_generator(data_generator,
+                args=[test_list_file, 0, batch_size, mask],
+                output_types=(tf.float32, tf.int16),
+                output_shapes=((None, len(variables)), ()))
+
+        test_data = test_data.apply(bucket_by_seq_len)
+        y_true = []
+        y_pred = []
+        for batch, (x, y) in enumerate(test_data):
+            y_pred.append(np.argmax(model.predict_on_batch(x), axis=1))
+            y_true.append(y.numpy())
+
+
+        y_pred = np.concatenate(y_pred).ravel()
+        y_true = np.concatenate(y_true).ravel()
+
+        evaluate_classification_model(y_true, y_pred)
 
 
 if __name__ == '__main__':

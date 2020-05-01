@@ -213,12 +213,22 @@ def data_generator(list_file, steps, batch_size, task='classification',
         mask=True, shuffle=True):
     reader = TimeSeriesReader(list_file, mask=mask)
 
-    chunk_size = steps*batch_size
+    if steps:
+        chunk_size = steps*batch_size
+    else:
+        chunk_size = reader.get_number_of_sequences()
+        chunk_size = 2000
+        cnt = 0
 
     while True:
         if shuffle: reader.random_shuffle(seed=42)
 
         remaining = chunk_size
+        if not steps:
+            if cnt == 1:
+                break
+            else:
+                cnt +=1
 
         while remaining > 0:
             current_size = min(chunk_size, remaining)
@@ -234,7 +244,6 @@ def data_generator(list_file, steps, batch_size, task='classification',
                     yield x, y
                 else:
                     yield x, t
-
 
 def create_list_file(subject_dirs, list_file_path,
         ts_fname='timeseries_normalized.csv'):
