@@ -220,7 +220,8 @@ def data_generator(list_file, steps, batch_size, task='classification',
         cnt = 0
 
     while True:
-        if shuffle: reader.random_shuffle(seed=42)
+        if shuffle and reader.current_index == 0:
+            reader.random_shuffle(seed=42)
 
         remaining = chunk_size
         if not steps:
