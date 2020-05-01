@@ -217,7 +217,6 @@ def data_generator(list_file, steps, batch_size, task='classification',
         chunk_size = steps*batch_size
     else:
         chunk_size = reader.get_number_of_sequences()
-        chunk_size = 2000
         cnt = 0
 
     while True:
