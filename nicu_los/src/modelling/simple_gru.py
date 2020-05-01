@@ -48,13 +48,14 @@ def parse_cl_args():
             help='The starting epoch if loading a checkpoint file.')
     parser.add_argument('--model-name', type=str, default='',
             help='The name of the model to be trained.')
+    parser.add_argument('--early-stopping', type=int, default=0,
+            help='Whether to use the early stopping callback.')
 
     return parser.parse_args(argv[1:])
 
 
 def main(args):
-    #strategy = tf.distribute.MirroredStrategy(devices=["/gpu:0",
-        #"/gpu:1"])
+    strategy = tf.distribute.MirroredStrategy()
     training = args.training
     model_name = args.model_name
     if training:
@@ -92,20 +93,20 @@ def main(args):
         if mask:
             variables = variables + ['mask_' + v for v in variables]
 
-    #with strategy.scope():
-    # Construct the model
-    model = construct_simple_gru()
-    if args.checkpoint_file:
-        model.load_weights(os.path.join(checkpoints_dir,
-            args.checkpoint_file))
+    with strategy.scope():
+        # Construct the model
+        model = construct_simple_gru()
+        if args.checkpoint_file:
+            model.load_weights(os.path.join(checkpoints_dir,
+                args.checkpoint_file))
 
-    # Compile the model
-    model.compile(
-            optimizer=Adam(),
-            loss=SparseCategoricalCrossentropy(),
-            metrics=['accuracy'])
+        # Compile the model
+        model.compile(
+                optimizer=Adam(),
+                loss=SparseCategoricalCrossentropy(),
+                metrics=['accuracy'])
 
-    model.summary()
+        model.summary()
 
     if training:
         train_list_file = os.path.join(data_path, 'train_list.txt')
@@ -141,10 +142,12 @@ def main(args):
                 histogram_freq=1)
         logger_callback = CSVLogger(os.path.join(models_path, 'logs',
             'logs.csv'))
-        early_stopping_callback = EarlyStopping(monitor='val_loss', min_delta=0,
-                patience=0)
-        callbacks = [early_stopping_callback, checkpoint_callback,
-                logger_callback, tensorboard_callback]
+        callbacks = [checkpoint_callback, logger_callback, tensorboard_callback]
+
+        if args.early_stopping:
+            early_stopping_callback = EarlyStopping(monitor='val_loss', min_delta=0,
+                    patience=0)
+            callbacks.append(early_stopping_callback)
 
         model.fit(
             train_data,
