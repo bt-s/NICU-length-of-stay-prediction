@@ -16,7 +16,7 @@ from tqdm import tqdm
 
 import tensorflow as tf
 from tensorflow.keras.models import Model
-from tensorflow.keras.layers import Dense, Dropout, Input, LSTM
+from tensorflow.keras.layers import Dense, Dropout, GRU, Input
 
 from ..utils.utils import get_subject_dirs
 
@@ -171,14 +171,14 @@ class TimeSeriesReader(object):
         return self.read_sequence(self.current_index)
 
 
-def construct_simple_lstm(input_dimension=28, dropout=0.3, hid_dimension=64,
+def construct_simple_gru(input_dimension=28, dropout=0.3, hid_dimension=64,
         is_bidirectional=True):
     X = Input(shape=(None, input_dimension))
     inputs = [X]
 
     num_hid_units = hid_dimension
 
-    X = LSTM(activation='tanh', dropout=dropout,
+    X = GRU(activation='tanh', dropout=dropout,
             recurrent_dropout=dropout,
             return_sequences=False,
             units=num_hid_units)(inputs)
