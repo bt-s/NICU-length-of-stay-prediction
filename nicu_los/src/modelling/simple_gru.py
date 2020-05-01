@@ -48,6 +48,8 @@ def parse_cl_args():
             help='The starting epoch if loading a checkpoint file.')
     parser.add_argument('--model-name', type=str, default='',
             help='The name of the model to be trained.')
+    parser.add_argument('--early-stopping', type=int, default=0,
+            help='Whether to use the early stopping callback.')
 
     return parser.parse_args(argv[1:])
 
@@ -141,10 +143,12 @@ def main(args):
                 histogram_freq=1)
         logger_callback = CSVLogger(os.path.join(models_path, 'logs',
             'logs.csv'))
-        early_stopping_callback = EarlyStopping(monitor='val_loss', min_delta=0,
-                patience=0)
-        callbacks = [early_stopping_callback, checkpoint_callback,
-                logger_callback, tensorboard_callback]
+        callbacks = [checkpoint_callback, logger_callback, tensorboard_callback]
+
+        if args.early_stopping:
+            early_stopping_callback = EarlyStopping(monitor='val_loss', min_delta=0,
+                    patience=0)
+            callbacks.append(early_stopping_callback)
 
         model.fit(
             train_data,
