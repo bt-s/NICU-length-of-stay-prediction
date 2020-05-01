@@ -44,13 +44,18 @@ def parse_cl_args():
             help='File from which to load the model weights.')
     parser.add_argument('--initial-epoch', type=int, default=0,
             help='The starting epoch if loading a checkpoint file.')
+    parser.add_argument('--model-name', type=str, default='',
+            help='The name of the model to be trained.')
 
     return parser.parse_args(argv[1:])
 
 
 def main(args):
-    strategy = tf.distribute.MirroredStrategy(devices=["/gpu:0",
-        "/gpu:1"])
+    strategy = tf.distribute.MirroredStrategy()
+    training = args.training
+    model_name = args.model_name
+    if training:
+        print(f'Training {model_name}')
 
     data_path = args.data_path
     models_path = args.models_path
@@ -70,7 +75,7 @@ def main(args):
     initial_epoch = args.initial_epoch
     training = args.training
 
-    checkpoint_path = os.path.join(checkpoints_dir,
+    checkpoint_path = os.path.join(checkpoints_dir, f'{model_name}-' + \
             f'batch{batch_size}-steps{training_steps}-epoch' + \
             '{epoch:02d}.h5')
 
@@ -86,10 +91,10 @@ def main(args):
 
     with strategy.scope():
         # Construct the model
-        model = construct_simple_lstm()
+        model = construct_simple_lstm(input_dimension=len(variables))
         if args.checkpoint_file:
-        model.load_weights(os.path.join(checkpoints_dir,
-            args.checkpoint_file))
+            model.load_weights(os.path.join(checkpoints_dir,
+                args.checkpoint_file))
 
         # Compile the model
         model.compile(
