@@ -16,9 +16,7 @@ import matplotlib.pyplot as plt
 from sys import argv
 from tqdm import tqdm
 
-from ..utils.utils import compute_remaining_los, get_subject_dirs, \
-        round_up_to_hour
-from ..utils.preprocessing_utils import los_hours_to_target
+from ..utils.utils import get_subject_dirs
 from ..utils.visualization_utils import create_histogram
 
 
@@ -52,29 +50,17 @@ def main(args):
     los_remaining_hours, los_remaining_targets = [], []
 
     for i, sd in enumerate(tqdm(subject_directories)):
-        # Read the stay dataframe and obtain the intime and total hour of stay
-        stay = pd.read_csv(os.path.join(sd, 'stay.csv'))
-        intime = round_up_to_hour(stay.iloc[0].INTIME)
-        los_hours_tot = stay.iloc[0].LOS_HOURS
-
         # Read the timeseries dataframe
         ts = pd.read_csv(os.path.join(sd, 'timeseries.csv'))
-        ts.CHARTTIME = ts.CHARTTIME.apply(lambda x: round_up_to_hour(x))
-
-        # Compute the reamining LOS in hours for each charrtime
-        ts['LOS_HOURS_REMAINING'] = ts.CHARTTIME.apply(lambda x:
-                compute_remaining_los(x, intime, los_hours_tot))
 
         # Find the total length of the stay in hours
-        tot_hours = stay.LOS_HOURS.iloc[0]
-        los_hours.append(tot_hours)
+        los_hours.append(ts.LOS_HOURS.iloc[0])
 
         # Compute the target bucket for the complete stay
-        los_targets.append(los_hours_to_target(tot_hours))
+        los_targets.append(ts.TARGET.iloc[0])
 
         # Find all the intermediate remaining length of stay in hours
-        tot_hours_remaining = ts.LOS_HOURS_REMAINING.to_list()
-        los_remaining_hours += tot_hours_remaining
+        los_remaining_hours += ts.LOS_HOURS.to_list()
 
         # Obtain the target bucket for each intermediate time-step
         los_remaining_targets += ts.TARGET.to_list()
@@ -98,7 +84,7 @@ def main(args):
             save_plot=(os.path.join(args.plots_path,
                 'normalized_frequency_of_the_target_buckets')))
 
-                # Create the LOS hours histogram
+    # Create the LOS hours histogram
     create_histogram(input_data=[los_hours, los_remaining_hours],
             xlabel='Hours', ylabel='Frequency', rwidth=1,
             legend=['LOS', 'Remaining LOS'], save_plot=(os.path.join(

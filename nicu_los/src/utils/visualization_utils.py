@@ -55,8 +55,8 @@ def create_histogram(input_data, title='', rotation=0, fig_size=(12.376, 8), xla
         # This works for multiple data sets with overlapping bars
         else:
             for i in input_data:
-                plt.hist(i, max_val, label=i, density=normalize, alpha=alpha,
-                        rwidth=rwidth, align='mid')
+                plt.hist(i, np.arange(0, max_val, 5), label=i,
+                        density=normalize, alpha=alpha, rwidth=rwidth, align='mid')
 
     # Set the legend
     if legend: plt.legend(loc='upper right', fontsize='xx-large', labels=legend)
