@@ -18,10 +18,20 @@ import tensorflow as tf
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Dense, Dropout, Input, LSTM
 
-from ..utils.utils import get_subject_dirs
+from nicu_los.src.utils.utils import get_subject_dirs
 
 
 def get_baseline_datasets(subject_dirs):
+    """Obtain baseline data sets
+
+    Args:
+        subject_dirs (list): List of subject directories
+
+    Returns:
+        X (np.ndarray): Features
+        y (np.array): Targets -- remaining LOS
+        t (np.array): Target -- buckets
+    """
     tot_num_sub_seqs = 0
     for i, sd in enumerate(tqdm(subject_dirs)):
         tot_num_sub_seqs += len(pd.read_csv(os.path.join(sd,
@@ -56,6 +66,27 @@ def get_baseline_datasets(subject_dirs):
 
 
 def get_train_val_test_baseline_sets(data_path, task):
+    """Get the training, validation and test baseline data sets
+
+    Args:
+        data_path (str): Path to the data directory
+        task (str): One of 'regression' and 'classification'
+
+    Returns:
+        X_train (np.ndarray): Training features
+        X_val (np.ndarray): Validation features
+        X_test (np.ndarray): Test features
+
+        EITHER (if task == 'regression'):
+            y_train (np.ndarray): Training targets -- remaining LOS
+            y_val (np.ndarray): Validation targets -- remaining LOS
+            y_test (np.ndarray): Test targets -- remaining LOS
+
+        OR (if task == 'classification'):
+            t_train (np.ndarray): Training targets -- buckets
+            t_val (np.ndarray): Validation targets -- buckets
+            t_test (np.ndarray): Test targets -- buckets
+    """
     with open(os.path.join(data_path, 'training_subjects.txt'), 'r') as f:
         train_dirs = f.read().splitlines()
     with open(os.path.join(data_path, 'validation_subjects.txt') , 'r') as f:
@@ -80,7 +111,6 @@ def get_train_val_test_baseline_sets(data_path, task):
     else:
         raise ValueError("Task must be one of: 'classification', \
                 'regression'.")
-
 
 
 class TimeSeriesReader(object):
@@ -191,7 +221,16 @@ def construct_simple_lstm(input_dimension=28, dropout=0.3, hid_dimension=64):
     return Model(inputs=inputs, outputs=outputs, name='simple_lstm')
 
 
-def sort_and_shuffle(data, batch_size):
+def sort_and_batch_shuffle(data, batch_size):
+    """Sort the data set and shuffle the batches
+
+    Args:
+        data ():
+        batch_size (int):
+
+    Returns:
+        data ():
+    """
     # Unpack Xs, ys, ts
     Xs = data['X']
     ys = data['y']
@@ -221,19 +260,46 @@ def sort_and_shuffle(data, batch_size):
 
 
 def zero_pad_timeseries(batch):
+    """Zero pad a timeseries batch to the length of of the longest series
+
+    Args:
+        batch ():
+
+    Returns:
+        batch ():
+    """
     dtype = batch[0].dtype
     max_len = max([x.shape[0] for x in batch])
 
-    padded_batch = np.array(
-            [np.concatenate(
-                [x, np.zeros((max_len - x.shape[0],) + x.shape[1:], dtype=dtype)], axis=0)
-                for x in batch])
+    # Pad the batch
+    batch = [np.concatenate([x, np.zeros((max_len - x.shape[0],) + x.shape[1:],
+        dtype=dtype)], axis=0) for x in batch]
+    batch = np.array(batch)
 
-    return padded_batch
+    return batch
 
 
 def data_generator(list_file, steps, batch_size, task='classification',
         mask=True, shuffle=True):
+    """Data loader function
+
+    Args:
+        list_file (str): Path to a file that contains a list of paths to
+                         timeseries
+        steps (int): Number of steps per epoch
+        batch_size (int): Training batch size
+        taks (str): One of 'classification'  and 'regression'
+        mask (bool): Whether to mask the variables
+        shuffle (bool): Whether to shuffle the data
+
+    Yields:
+        X (np.ndarray): Features corresponding to one data batch
+
+        EITHER (if task == 'regression'):
+            y ():
+        OR (if task == 'classification'):
+            t ():
+    """
     reader = TimeSeriesReader(list_file, mask=mask)
 
     if steps:
@@ -259,7 +325,7 @@ def data_generator(list_file, steps, batch_size, task='classification',
 
             data = reader.read_chunk(current_size)
 
-            (Xs, ys, ts) = sort_and_shuffle(data, batch_size)
+            (Xs, ys, ts) = sort_and_batch_shuffle(data, batch_size)
 
             for i in range(0, current_size, batch_size):
                 X = zero_pad_timeseries(Xs[i:i + batch_size])
@@ -274,8 +340,16 @@ def data_generator(list_file, steps, batch_size, task='classification',
 
 def create_list_file(subject_dirs, list_file_path,
         ts_fname='timeseries_normalized.csv'):
+    """Create a file containing a list of paths to timeseries data frames
+
+    Args:
+        subject_dirs (list): List of subject directories
+        list_file_path (str): Path to the list file
+        ts_fname (str): Name of the timeseries file
+    """
     with open(list_file_path, 'a') as f:
         for i, sd in enumerate(tqdm(subject_dirs)):
             ts = pd.read_csv(os.path.join(sd, ts_fname))
             for row in range(1, len(ts)+1):
                 f.write(f'{sd}, {row}\n')
+

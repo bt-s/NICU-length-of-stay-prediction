@@ -11,9 +11,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def create_histogram(input_data, title='', rotation=0, fig_size=(12.376, 8), xlabel='',
-        ylabel='', normalize=True, bar_labels=False, xticks=False, alpha=0.5,
-        rwidth=1, legend=[], save_plot=""):
+def create_histogram(input_data, title='', rotation=0, fig_size=(12.376, 8),
+        xlabel='', ylabel='', normalize=True, bar_labels=False, xticks=False,
+        alpha=0.5, rwidth=1, legend=[], save_plot=""):
     """Create a histogram
 
     Args:
@@ -56,7 +56,8 @@ def create_histogram(input_data, title='', rotation=0, fig_size=(12.376, 8), xla
         else:
             for i in input_data:
                 plt.hist(i, np.arange(0, max_val, 5), label=i,
-                        density=normalize, alpha=alpha, rwidth=rwidth, align='mid')
+                        density=normalize, alpha=alpha, rwidth=rwidth,
+                        align='mid')
 
     # Set the legend
     if legend: plt.legend(loc='upper right', fontsize='xx-large', labels=legend)
@@ -68,7 +69,8 @@ def create_histogram(input_data, title='', rotation=0, fig_size=(12.376, 8), xla
     # Make sure that x-ticks are positioned correctly
     plt.subplots_adjust(bottom=0.3)
     if xticks:
-        plt.xticks(np.arange(len(xticks)), xticks, rotation=rotation, fontsize=16)
+        plt.xticks(np.arange(len(xticks)), xticks, rotation=rotation,
+                fontsize=16)
 
     # Set the size of the x- and y-ticks
     plt.yticks(fontsize=16)

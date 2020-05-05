@@ -6,8 +6,9 @@
 
 __author__ = "Bas Straathof"
 
-from ..utils.preprocessing_utils import extract_gest_age_from_note
-from ..utils.reg_exps import reg_exps
+from nicu_los.src.preprocessing.process_mimic3_tables import \
+        extract_gest_age_from_note
+from nicu_los.src.utils.reg_exps import reg_exps
 import unittest
 
 error_strings = [
@@ -113,8 +114,7 @@ class TestGAExtractor(unittest.TestCase):
                 reg_exps)
         self.assertEqual([d, w], [226, 32])
 
-        m, d, w = extract_gest_age_from_note('dol 13 pma 34 1/7 weeks',
-                reg_exps)
+        m, d, w = extract_gest_age_from_note('dol 13 pma 34 1/7 weeks', reg_exps)
         self.assertEqual([d, w], [226, 32])
 
         m, d, w = extract_gest_age_from_note('dol 11 / now 34.2 weeks',

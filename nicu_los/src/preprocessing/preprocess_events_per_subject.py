@@ -18,8 +18,8 @@ import multiprocessing as mp
 
 from tqdm import tqdm
 
-from ..utils.preprocessing_utils import clean_variables, remove_invalid_values
-from ..utils.utils import get_subject_dirs, remove_subject_dir
+from nicu_los.src.utils.cleaning_functions import cleaning_functions
+from nicu_los.src.utils.utils import get_subject_dirs, remove_subject_dir
 
 
 def parse_cl_args():
@@ -34,6 +34,78 @@ def parse_cl_args():
             help='Level of verbosity in console output.', default=1)
 
     return parser.parse_args(sys.argv[1:])
+
+
+def clean_variables(df, cleaning_functions):
+    """Clean all variables in a dataframe containing all selected clinical
+    event variables corresponding to a subject
+
+    Args:
+        df (pd.DataFrame): Dataframe containing clinical variables
+        cleaning_functions (dict): Dictionary of variable to cleaning function
+                                   mappings
+
+    Returns:
+        df (pd.DataFrame): Dataframe containing all cleaned clinical variables
+                           that are not null
+    """
+    for var, fn in cleaning_functions.items():
+        indices = (df.VARIABLE == var)
+
+        fn = cleaning_functions[var]
+
+        try:
+            df.loc[indices, 'VALUE'] = fn(df.VALUE.loc[indices])
+        except Exception as e:
+            print(f'Error: {e} in {fn.__name__}')
+            exit()
+
+
+    return df.loc[df.VALUE.notnull()]
+
+
+def remove_invalid_values(df_events, valid_ranges, value_counts):
+    """Remove clinical events with a value outside the valid range
+
+    Args:
+        df_events (pd.DataFrame): Containing the clinical events associated
+                                  with a subject
+        valid_ranges (dict): Mapping from variables to their valid min and max
+                             values
+        value_counts (dict): Dictionary storing values for statistics
+
+    Returns:
+        df (pd.DataFrame): Only containing valid clinical event values
+        value_counts (dict): Appended dictionary for statistics
+    """
+    # Create empty dataframe
+    df = pd.DataFrame(columns=['SUBJECT_ID', 'HADM_ID', 'ICUSTAY_ID',
+        'CHARTTIME', 'ITEMID', 'VALUE', 'VALUEUOM', 'VARIABLE'])
+
+    for var in valid_ranges.keys():
+        df_var_events = df_events.loc[df_events.VARIABLE == var]
+        df_var_events.VALUE = df_var_events.VALUE.astype(float)
+
+        # Originial number of events for var
+        num_events_var_orig = len(df_var_events)
+
+        # Remove invalid values
+        df_var_events = df_var_events.loc[(df_var_events.VALUE >=
+            valid_ranges[var]['MIN']) & (df_var_events.VALUE <=
+                valid_ranges[var]['MAX'])]
+        num_invalid_values = num_events_var_orig - len(df_var_events)
+
+        # Store all valid values
+        value_counts[var]['VALUES'].extend(df_var_events.VALUE.tolist())
+
+        # Append to df
+        df = df.append(df_var_events)
+
+        if not df_var_events.empty:
+            value_counts[var]['SUBJECTS'] += 1
+            value_counts[var]['INVALID_VALUES'] += num_invalid_values
+
+    return df, value_counts
 
 
 def main(args):

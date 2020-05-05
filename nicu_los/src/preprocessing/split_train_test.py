@@ -19,8 +19,6 @@ def parse_cl_args():
             help='Path to subject directories.')
     parser.add_argument('-tp', '--training-percentage', type=str, default=80,
             help='Percentage of training split.')
-    parser.add_argument('-v', '--verbose', type=int,
-            help='Level of verbosity in console output.', default=1)
 
     return parser.parse_args(argv[1:])
 
@@ -45,7 +43,7 @@ def move_to_directory(subjects_path, subject_dirs, dir_name):
 
 def main(args):
     random.seed(21128947124)
-    subjects_path, verbose = args.subjects_path, args.verbose
+    subjects_path = args.subjects_path
     perc = args.training_percentage / 100
 
     subject_dirs = os.listdir(subjects_path)
@@ -59,9 +57,8 @@ def main(args):
     train_dirs = subject_dirs[:split]
     test_dirs = subject_dirs[split:]
 
-    if verbose:
-        print(f'There are {len(train_dirs)} train directories ' \
-                f'and {len(test_dirs)} test directories.')
+    print(f'There are {len(train_dirs)} train directories ' \
+            f'and {len(test_dirs)} test directories.')
 
     # Create train and test directories
     move_to_directory(subjects_path, train_dirs, 'train')

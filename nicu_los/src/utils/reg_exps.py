@@ -7,7 +7,6 @@ As part of my Master's thesis at KTH Royal Institute of Technology.
 
 __author__ = "Bas Straathof"
 
-
 import re
 
 

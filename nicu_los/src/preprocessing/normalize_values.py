@@ -17,7 +17,7 @@ import multiprocessing as mp
 import pandas as pd
 import numpy as np
 
-from ..utils.utils import get_subject_dirs
+from nicu_los.src.utils.utils import get_subject_dirs
 
 
 def parse_cl_args():
@@ -27,8 +27,6 @@ def parse_cl_args():
             help='Path to the train directories.')
     parser.add_argument('-tep', '--test-path', type=str, default='data/test/',
             help='Path to the testdirectories.')
-    parser.add_argument('-v', '--verbose', type=int,
-            help='Level of verbosity in console output.', default=1)
 
     return parser.parse_args(argv[1:])
 

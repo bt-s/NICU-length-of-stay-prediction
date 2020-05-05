@@ -16,7 +16,7 @@ from tqdm import tqdm
 import pandas as pd
 import numpy as np
 
-from ..utils.utils import get_subject_dirs
+from nicu_los.src.utils.utils import get_subject_dirs
 
 
 def parse_cl_args():
@@ -24,20 +24,16 @@ def parse_cl_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('-trp', '--train-path', type=str, default='data/train/',
             help='Path to the train directories.')
-    parser.add_argument('-v', '--verbose', type=int,
-            help='Level of verbosity in console output.', default=1)
 
     return parser.parse_args(argv[1:])
 
 
 def main(args):
-    train_path = args.train_path
-
-    train_dirs = get_subject_dirs(train_path)
+    train_dirs = get_subject_dirs(args.train_path)
 
     with open('nicu_los/config.json', 'r') as f:
         config = json.load(f)
-    variables = config['variables']
+        variables = config['variables']
 
     for var in variables:
         values = []

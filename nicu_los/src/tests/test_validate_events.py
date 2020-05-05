@@ -7,7 +7,7 @@
 
 __author__ = "Bas Straathof"
 
-from ..utils.preprocessing_utils import \
+from nicu_los.src.preprocessing.process_mimic3_tables import \
         validate_events_and_notes_per_subject
 import unittest
 import pandas as pd

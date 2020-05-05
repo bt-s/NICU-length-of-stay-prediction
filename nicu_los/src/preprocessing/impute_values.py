@@ -16,7 +16,7 @@ from itertools import repeat
 import multiprocessing as mp
 import pandas as pd
 
-from ..utils.utils import get_subject_dirs, istarmap
+from nicu_los.src.utils.utils import get_subject_dirs, istarmap
 
 
 def parse_cl_args():
@@ -28,8 +28,6 @@ def parse_cl_args():
             help='Impute method to use: either "ffill" or "zeros".')
     parser.add_argument('-ma', '--mask', type=str, default=True,
             help='Whether to create binary imputation indicator variables.')
-    parser.add_argument('-v', '--verbose', type=str, default=True,
-            help='Console output verbosity flag.')
 
     return parser.parse_args(argv[1:])
 
@@ -88,9 +86,8 @@ def main(args):
         config = json.load(f)
         normal_values = config['normal_values']
 
-    if args.verbose:
-        print(f'Starting forward fill imputing with normal values.' \
-               f'Binary imputation mask: {args.mask}')
+    print(f'Starting forward fill imputing with normal values.' \
+            f'Binary imputation mask: {args.mask}')
 
     subject_dirs = get_subject_dirs(args.subjects_path)
 

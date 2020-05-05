@@ -6,7 +6,7 @@
 
 __author__ = "Bas Straathof"
 
-from ..utils.utils import round_up_to_hour
+from nicu_los.src.utils.utils import round_up_to_hour
 import datetime
 import unittest
 

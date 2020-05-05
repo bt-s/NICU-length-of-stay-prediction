@@ -6,8 +6,8 @@
 
 __author__ = "Bas Straathof"
 
-from ..utils.preprocessing_utils import transfer_filter
-from ..utils.reg_exps import reg_exps
+from nicu_los.src.preprocessing.process_mimic3_tables import transfer_filter
+from nicu_los.src.utils.reg_exps import reg_exps
 import unittest
 
 test_strings = [
