@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-"""simple_gru.py
+"""simple_lstm.py
 
 Implementation of a simple LSTM model to predict the remaining length-of-stay.
 """
@@ -18,9 +18,9 @@ from sys import argv
 from datetime import datetime
 import numpy as np
 
-from ..utils.modelling_utils import create_list_file, data_generator, \
-        get_bucket_by_seq_len, construct_simple_gru
-from ..utils.evaluation_utils import evaluate_classification_model
+from nicu_los.src.utils.modelling_utils import create_list_file, \
+        data_generator, construct_simple_lstm
+from nicu_los.src.utils.evaluation_utils import evaluate_classification_model
 
 
 def parse_cl_args():
@@ -29,7 +29,7 @@ def parse_cl_args():
     parser.add_argument('--data-path', type=str, default='data',
             help='Path to the data directories.')
     parser.add_argument( '--models-path', type=str,
-            default='models/simple_gru',
+            default='models/simple_lstm',
             help='Path to the simple LSTM models directory.')
     parser.add_argument('--batch-size', type=int, default=8, help='Batch size.')
     parser.add_argument('--mask-indicator', type=int, default=1,
@@ -55,7 +55,9 @@ def parse_cl_args():
 
 
 def main(args):
-    strategy = tf.distribute.MirroredStrategy()
+    #strategy = tf.distribute.MirroredStrategy()
+    os.environ["CUDA_VISIBLE_DEVICES"] = "-1" # No GPU
+
     training = args.training
     model_name = args.model_name
     if training:
@@ -83,8 +85,6 @@ def main(args):
             f'batch{batch_size}-steps{training_steps}-epoch' + \
             '{epoch:02d}.h5')
 
-    bucket_by_seq_len = get_bucket_by_seq_len(batch_size)
-
     # Obtain the training variables
     with open('nicu_los/config.json') as f:
         config = json.load(f)
@@ -93,20 +93,20 @@ def main(args):
         if mask:
             variables = variables + ['mask_' + v for v in variables]
 
-    with strategy.scope():
-        # Construct the model
-        model = construct_simple_gru()
-        if args.checkpoint_file:
-            model.load_weights(os.path.join(checkpoints_dir,
-                args.checkpoint_file))
+    #with straItegy.scope():
+    # Construct the model
+    model = construct_simple_lstm()
+    if args.checkpoint_file:
+        model.load_weights(os.path.join(checkpoints_dir,
+            args.checkpoint_file))
 
-        # Compile the model
-        model.compile(
-                optimizer=Adam(),
-                loss=SparseCategoricalCrossentropy(),
-                metrics=['accuracy'])
+    # Compile the model
+    model.compile(
+            optimizer=Adam(),
+            loss=SparseCategoricalCrossentropy(),
+            metrics=['accuracy'])
 
-        model.summary()
+    model.summary()
 
     if training:
         train_list_file = os.path.join(data_path, 'train_list.txt')
@@ -125,16 +125,12 @@ def main(args):
         train_data = tf.data.Dataset.from_generator(data_generator,
                 args=[train_list_file, training_steps, batch_size, mask],
                 output_types=(tf.float32, tf.int16),
-                output_shapes=((None, len(variables)), ()))
+                output_shapes=((batch_size, None, len(variables)), (batch_size,)))
 
         val_data = tf.data.Dataset.from_generator(data_generator,
                 args=[val_list_file, validation_steps, batch_size, mask],
                 output_types=(tf.float32, tf.int16),
-                output_shapes=((None, len(variables)), ()))
-
-        # Sort the data set batches by sequence length
-        train_data = train_data.apply(bucket_by_seq_len)
-        val_data = val_data.apply(bucket_by_seq_len)
+                output_shapes=((batch_size, None, len(variables)), (batch_size,)))
 
         # Callbacks
         checkpoint_callback = ModelCheckpoint(checkpoint_path)
@@ -149,6 +145,7 @@ def main(args):
                     patience=0)
             callbacks.append(early_stopping_callback)
 
+        # Fit the model
         model.fit(
             train_data,
             validation_data=val_data,
@@ -171,7 +168,6 @@ def main(args):
                 output_types=(tf.float32, tf.int16),
                 output_shapes=((None, len(variables)), ()))
 
-        test_data = test_data.apply(bucket_by_seq_len)
         y_true = []
         y_pred = []
         for batch, (x, y) in enumerate(test_data):
