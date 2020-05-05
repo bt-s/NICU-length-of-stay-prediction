@@ -16,7 +16,7 @@ from tqdm import tqdm
 
 import tensorflow as tf
 from tensorflow.keras.models import Model
-from tensorflow.keras.layers import Dense, Dropout, GRU, Input
+from tensorflow.keras.layers import Dense, Dropout, Input, LSTM
 
 from ..utils.utils import get_subject_dirs
 
@@ -171,14 +171,13 @@ class TimeSeriesReader(object):
         return self.read_sequence(self.current_index)
 
 
-def construct_simple_gru(input_dimension=28, dropout=0.3, hid_dimension=64,
-        is_bidirectional=True):
+def construct_simple_lstm(input_dimension=28, dropout=0.3, hid_dimension=64):
     X = Input(shape=(None, input_dimension))
     inputs = [X]
 
     num_hid_units = hid_dimension
 
-    X = GRU(activation='tanh', dropout=dropout,
+    X = LSTM(activation='tanh', dropout=dropout,
             recurrent_dropout=dropout,
             return_sequences=False,
             units=num_hid_units)(inputs)
@@ -192,21 +191,45 @@ def construct_simple_gru(input_dimension=28, dropout=0.3, hid_dimension=64,
     return Model(inputs=inputs, outputs=outputs, name='simple_lstm')
 
 
+def sort_and_shuffle(data, batch_size):
+    # Unpack Xs, ys, ts
+    Xs = data['X']
+    ys = data['y']
+    ts = data['t']
 
-def get_bucket_by_seq_len(batch_size):
-    def element_length_fn(x, y):
-        return tf.shape(x)[0]
+    # Zip the data together
+    data = list(zip(Xs, ys, ts))
 
-    bucket_boundaries = [8, 16, 32, 48, 64, 96, 128, 176, 256, 384, 512, 768,
-            1280, 2048]
-    bucket_batch_sizes = [batch_size for x in range(len(bucket_boundaries) + 1)]
+    # Find and drop the remainder
+    remainder = len(data) % batch_size
+    data = data[:len(data)- remainder]
 
-    # Sequences require the same length per batch
-    bucket_by_seq_len = tf.data.experimental.bucket_by_sequence_length(
-            element_length_fn, bucket_boundaries, bucket_batch_sizes,
-            drop_remainder=True)
+    # Sort the data by length of the time series
+    data.sort(key=(lambda x: x[0].shape[0]))
 
-    return bucket_by_seq_len
+    # Create batches of time series that are closest in length
+    batches = [data[i: i + batch_size] for i in range(0, len(data), batch_size)]
+
+    # Shuffle the batches randomly
+    random.shuffle(batches)
+
+    # Flatten the batches and zip the data together
+    data = [x for batch in batches for x in batch]
+    data = list(zip(*data))
+
+    return data
+
+
+def zero_pad_timeseries(batch):
+    dtype = batch[0].dtype
+    max_len = max([x.shape[0] for x in batch])
+
+    padded_batch = np.array(
+            [np.concatenate(
+                [x, np.zeros((max_len - x.shape[0],) + x.shape[1:], dtype=dtype)], axis=0)
+                for x in batch])
+
+    return padded_batch
 
 
 def data_generator(list_file, steps, batch_size, task='classification',
@@ -235,15 +258,19 @@ def data_generator(list_file, steps, batch_size, task='classification',
             remaining -= current_size
 
             data = reader.read_chunk(current_size)
-            Xs = data['X']
-            ys = data['y']
-            ts = data['t']
 
-            for x, y, t in zip(Xs, ys, ts):
+            (Xs, ys, ts) = sort_and_shuffle(data, batch_size)
+
+            for i in range(0, current_size, batch_size):
+                X = zero_pad_timeseries(Xs[i:i + batch_size])
+                y = ys[i:i+batch_size]
+                t = ts[i:i+batch_size]
+
                 if task == 'regression':
-                    yield x, y
+                    yield X, y
                 else:
-                    yield x, t
+                    yield X, t
+
 
 def create_list_file(subject_dirs, list_file_path,
         ts_fname='timeseries_normalized.csv'):
