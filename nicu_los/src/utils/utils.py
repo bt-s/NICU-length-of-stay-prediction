@@ -157,7 +157,7 @@ def get_subject_dirs(path):
     dirs = set(filter(lambda x: str.isdigit(x), dirs))
 
     # Create a list of directory paths
-    dir_paths = [path + sd for sd in dirs]
+    dir_paths = [os.path.join(path, sd) for sd in dirs]
 
     return dir_paths
 

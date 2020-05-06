@@ -15,6 +15,8 @@ from tqdm import tqdm
 
 import pandas as pd
 import numpy as np
+import multiprocessing as mp
+from itertools import repeat
 
 from nicu_los.src.utils.utils import get_subject_dirs
 
@@ -28,6 +30,54 @@ def parse_cl_args():
     return parser.parse_args(argv[1:])
 
 
+def get_normalization_stats_for_var(variable, train_dirs, config, q):
+    """Worker function
+
+    Args:
+        variable (str): Variable for which to obtain the normalization statistics
+        train_dirs (list): List of training directories
+        config (dict): Configuration file
+        q (mp.Manager.Queue): Multiprocessing queue manager
+    
+    Sends the mean and standard deviation of variable to the queue mananger
+    """
+    values = []
+    for subject_dir in tqdm(train_dirs):
+        # Read the timeseries dataframe
+        df_ts = pd.read_csv(os.path.join(subject_dir,
+            'timeseries_imputed.csv'))
+
+        # Append the values of the current variable
+        values = values + df_ts[variable].to_list()
+
+    print(f'{variable} MEAN: {np.mean(values)}')
+    print(f'{variable} STDEV: {np.std(values)}')
+
+    q.put((variable, np.mean(values), np.std(values)))
+
+
+def listener(config, q):
+    """Listener function to ensure safe writing to config file
+    
+    Args:
+        config (dict): Configuration file
+        q (mp.Manager.Queue): Multiprocessing queue manager
+        
+    Writes the updated config to file
+    """
+    with open('nicu_los/config.json', 'w') as f:
+        while True:
+            m = q.get()
+
+            if m == 'kill':
+                json.dump(config, f)
+                f.truncate()
+                break
+            else:
+                config["normalization_statistics"][m[0]]["MEAN"] = m[1]
+                config["normalization_statistics"][m[0]]["STDEV"] = m[2]
+
+
 def main(args):
     train_dirs = get_subject_dirs(args.train_path)
 
@@ -35,23 +85,29 @@ def main(args):
         config = json.load(f)
         variables = config['variables']
 
-    for var in variables:
-        values = []
-        print(f"Finding the mean and the standard deviation of {var}...")
-        for subject_dir in tqdm(train_dirs):
-            # Read the timeseries dataframe
-            df_ts = pd.read_csv(os.path.join(subject_dir,
-                'timeseries_imputed.csv'))
+    manager = mp.Manager()
+    q = manager.Queue()
+    pool = mp.Pool()
 
-            # Append the values of the current variable
-            values = values + df_ts[var].to_list()
+    # Create a listener s.t. it is safe to write to the config file
+    watcher = pool.apply_async(listener, (config, q,))
 
-        config["normalization_statistics"][var]["MEAN"] = np.mean(values)
-        config["normalization_statistics"][var]["STDEV"] = np.std(values)
+    # Create worker processes
+    jobs = []
+    for variable in variables:
+        job = pool.apply_async(get_normalization_stats_for_var,
+                (variable, train_dirs, config, q))
+        jobs.append(job)
 
-    with open('nicu_los/config.json', 'w') as f:
-        json.dump(config, f)
-        f.truncate()
+    # Collect results rom the pool result queue
+    for job in jobs:
+        job.get()
+
+    # Kill the listener once all jobs are done
+    q.put('kill')
+    pool.close()
+    pool.join()
+
 
 if __name__ == '__main__':
     main(parse_cl_args())

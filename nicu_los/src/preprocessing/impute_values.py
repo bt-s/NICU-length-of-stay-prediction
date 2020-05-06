@@ -22,7 +22,7 @@ from nicu_los.src.utils.utils import get_subject_dirs, istarmap
 def parse_cl_args():
     """Parses CL arguments"""
     parser = argparse.ArgumentParser()
-    parser.add_argument('-sp', '--subjects-path', type=str, default='data/',
+    parser.add_argument('-sp', '--subjects-path', type=str, default='data',
             help='Path to subject directories.')
     parser.add_argument('-im', '--impute-method', type=str, default='ffill',
             help='Impute method to use: either "ffill" or "zeros".')
@@ -50,7 +50,8 @@ def impute(sd, normal_values, method='ffill', mask=True):
         # Create an imputation mask
         ts_mask = ts.mask(ts.notna(), 1)
         ts_mask = ts_mask.mask(ts.isna(), 0)
-        ts_mask = ts_mask.drop(['LOS_HOURS', 'TARGET'], axis=1)
+        ts_mask = ts_mask.drop(['LOS_HOURS', 'TARGET_COARSE', 'TARGET_FINE'],
+                axis=1)
         ts_mask = ts_mask.add_prefix('mask_')
 
     # Make sure that the first row contains values such that we can
@@ -82,18 +83,20 @@ def impute(sd, normal_values, method='ffill', mask=True):
 
 
 def main(args):
+    impute_method = args.impute_method
+
     with open('nicu_los/config.json') as f:
         config = json.load(f)
         normal_values = config['normal_values']
 
-    print(f'Starting forward fill imputing with normal values.' \
+    print(f'Starting {impute_method} imputing with normal values.' \
             f'Binary imputation mask: {args.mask}')
 
     subject_dirs = get_subject_dirs(args.subjects_path)
 
     with mp.Pool() as pool:
         for _ in tqdm(pool.istarmap(impute, zip(subject_dirs,
-            repeat(normal_values), repeat(args.impute_method),
+            repeat(normal_values), repeat(impute_method),
             repeat(args.mask))), total=len(subject_dirs)):
             pass
 
