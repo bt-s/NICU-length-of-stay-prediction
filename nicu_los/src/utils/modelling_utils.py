@@ -9,14 +9,21 @@ __author__ = "Bas Straathof"
 
 import errno, json, os, random
 
-import pandas as pd
+import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 
 from tqdm import tqdm
 
-import tensorflow as tf
+from sklearn.metrics import accuracy_score, cohen_kappa_score, \
+        confusion_matrix, f1_score, mean_absolute_error, mean_squared_error, \
+        plot_confusion_matrix, precision_score, recall_score, roc_auc_score
+
+from tensorflow.keras.callbacks import Callback
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Dense, Dropout, Input, LSTM
+from tensorflow.keras.losses import SparseCategoricalCrossentropy
+from tensorflow.keras.optimizers import Adam
 
 from nicu_los.src.utils.utils import get_subject_dirs
 
@@ -352,4 +359,114 @@ def create_list_file(subject_dirs, list_file_path,
             ts = pd.read_csv(os.path.join(sd, ts_fname))
             for row in range(1, len(ts)+1):
                 f.write(f'{sd}, {row}\n')
+
+
+def construct_and_compile_model(model_type, checkpoint_file,
+        checkpoints_dir):
+    model = construct_simple_lstm()
+
+    if checkpoint_file:
+        model.load_weights(os.path.join(checkpoints_dir, checkpoint_file))
+
+    model.compile(
+            optimizer=Adam(),
+            loss=SparseCategoricalCrossentropy(),
+            metrics=['accuracy'])
+
+    return model
+
+
+class MetricsCallback(Callback):
+    def __init__(self, model, training_data, validation_data, training_steps,
+            validation_steps):
+        self.model = model
+        self.training_data = training_data
+        self.validation_data = validation_data
+
+        self.training_steps = training_steps
+        self.validation_steps = validation_steps
+
+    def on_epoch_end(self, epoch, logs=None):
+        print('\nPredict on training data:\n')
+        y_true, y_pred = [], []
+        for batch, (x, y) in enumerate(self.training_data):
+            if batch > self.training_steps:
+                break
+
+            y_pred.append(np.argmax(self.model.predict_on_batch(x), axis=1))
+            y_true.append(y.numpy())
+
+        evaluate_classification_model(np.concatenate(y_true, axis=0),
+                np.concatenate(y_pred, axis=0))
+
+        print('\nPredict on validation data:\n')
+        y_true, y_pred = [], []
+        for batch, (x, y) in enumerate(self.validation_data):
+            if batch > self.validation_steps:
+                break
+
+            y_pred.append(np.argmax(self.model.predict_on_batch(x), axis=1))
+            y_true.append(y.numpy())
+
+        evaluate_classification_model(np.concatenate(y_true, axis=0),
+                np.concatenate(y_pred, axis=0))
+
+
+def mean_absolute_perc_error(y_true, y_pred):
+    return np.mean(np.abs((y_true - y_pred) / (y_true + 0.1))) * 100
+
+
+def evaluate_classification_model(y_true, y_pred, verbose=1):
+    kappa = cohen_kappa_score(y_true, y_pred, weights='linear')
+    acc = accuracy_score(y_true, y_pred)
+    precision = precision_score(y_true, y_pred, average='weighted')
+    recall = recall_score(y_true, y_pred, average='weighted')
+    f1 = f1_score(y_true, y_pred, average='weighted')
+    cm = confusion_matrix(y_true, y_pred)
+
+    if verbose:
+        print(f'Accuracy: {acc}')
+        print(f'Linear Cohen Kappa Score: {kappa}')
+        print(f'Precision: {precision}')
+        print(f'Recall: {recall}')
+        print(f'Confusion matrix:\n{cm}')
+
+    return {"accuracy": acc, 'kappa': kappa, 'precision': precision,
+            'recall': recall, 'cm': cm}
+
+
+def evaluate_regression_model(y_true, y_pred, verbose=1):
+    mad = mean_absolute_error(y_true, y_pred)
+    mse = mean_squared_error(y_true, y_pred)
+    rmse = np.sqrt(mse)
+    mape = mean_absolute_perc_error(y_true, y_pred)
+
+    if verbose:
+        print(f'Mean Absolute Deviation (MAD): {mad}')
+        print(f'Mean Squared Error (MSE): {mse}')
+        print(f'Root Mean Squared Error (RMSE): {rmse}')
+        print(f'Mean Aboslute Perentage Error (MAPE): {mape}')
+
+    return {'mad': mad, 'mse': mse, 'rmse': rmse, 'mape': mape}
+
+
+def get_confusion_matrix(model, X, y, save_plot='', class_names=['0-1',
+    '1-2', '2-3', '3-4', '4-5', '5-6', '6-7', '7-8', '8-14', '14+']):
+    titles_options = [("Confusion matrix, without normalization", None),
+                    ("Normalized confusion matrix", 'true')]
+    for title, normalize in titles_options:
+        disp = plot_confusion_matrix(model, X, y,
+                                    display_labels=class_names,
+                                    cmap=plt.cm.Blues,
+                                    normalize=normalize)
+        disp.ax_.set_title(title)
+
+        if save_plot:
+            if normalize: save_plot += '_normalized'
+            plt.savefig(save_plot, format="pdf", bbox_inches='tight',
+                    pad_inches=0)
+            plt.close()
+        else:
+            plt.show()
+            plt.close()
 

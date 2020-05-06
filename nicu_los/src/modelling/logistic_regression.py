@@ -20,8 +20,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import GridSearchCV, PredefinedSplit
 from sklearn.metrics import make_scorer, cohen_kappa_score
 
-from ..utils.evaluation_utils import evaluate_classification_model
-from ..utils.modelling_utils import get_baseline_datasets
+from nicu_los.src.utils.modelling_utils import evaluate_classification_model, \
+        get_baseline_datasets
 
 
 def parse_cl_args():
