@@ -13,6 +13,7 @@ import argparse, json, os
 from sys import argv
 
 import numpy as np
+import pandas as pd
 import multiprocessing as mp
 from itertools import repeat
 
@@ -20,17 +21,18 @@ from scipy.stats import skew
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
-from nicu_los.src.utils.preprocessing_utils import split_train_val
 from nicu_los.src.utils.utils import get_subject_dirs, remove_subject_dir
 
 
 def parse_cl_args():
     """Parses CL arguments"""
     parser = argparse.ArgumentParser()
-    parser.add_argument('-sp', '--subjects-path', type=str, default='data/',
+    parser.add_argument('-sp', '--subjects-path', type=str, default='data',
             help='Path to subject directories.')
     parser.add_argument('-pi', '--pre-imputed', type=int, default=0,
             help='Whether to use pre-imputed time-series.')
+    parser.add_argument('-c', '--coarse', type=int, default=0,
+            help='Whether to use coarse targets.')
 
     return parser.parse_args(argv[1:])
 
@@ -107,7 +109,7 @@ def compute_stats_for_subseqs(timeseries, variables, stat_fns, subseqs=[]):
 
 
 def create_baseline_datasets_per_subject(subject_dir, variables, stat_fns,
-        subseqs, pre_imputed=False):
+        subseqs, pre_imputed=False, coarse=False):
     """Create baseline data sets
 
     Args:
@@ -123,51 +125,24 @@ def create_baseline_datasets_per_subject(subject_dir, variables, stat_fns,
         ts = pd.read_csv(os.path.join(subject_dir, 'timeseries.csv'))
 
     y = ts.LOS_HOURS.to_numpy()
-    t = ts.TARGET.to_numpy()
+    if coarse:
+        t = ts.TARGET_COARSE.to_numpy()
+    else:
+        t = ts.TARGET_FINE.to_numpy()
 
     X = np.zeros((len(ts), len(stat_fns)*len(subseqs)*len(variables)))
 
     for i in range(1, len(ts)):
         X[i] = compute_stats_for_subseqs(ts[0:i], variables, stat_fns, subseqs)
 
-    np.save(f'{subject_dir}/X_baseline', X)
-    np.save(f'{subject_dir}/y_baseline', y)
-    np.save(f'{subject_dir}/t_baseline', t)
-
-
-def split_train_val(train_dirs_path, val_perc=20):
-    """Split the training data in a training and validation set
-
-    Args:
-        train_dirs_path (str): Path to the training directories
-        val_perc (int): Percentage of data to be reserved for validation
-
-    Returns:
-        train_dirs (list): List of training directories
-        val_dirs (list): List of validation directories
-    """
-    train_dirs = get_subject_dirs(train_dirs_path)
-
-    # Get two arrays: one of training targets and one of the
-    # corresponding subjects
-    targets_train = np.zeros(len(train_dirs))
-    subjects_train = np.zeros(len(train_dirs))
-    for i, sd in enumerate(train_dirs):
-        df_ts = pd.read_csv(os.path.join(sd, 'timeseries.csv'))
-        targets_train[i] = df_ts.TARGET.iloc[0]
-        subject_id = [int(s) for s in sd.split('/') if s.isdigit()][-1]
-        subjects_train[i] = subject_id
-
-    # Split the subjects list into training subjects list and a
-    # validation subjects list, in a stratified manner
-    subjects_train, subjects_val, _, _ = train_test_split(
-            subjects_train, targets_train, test_size=val_perc/100,
-            stratify=targets_train, shuffle=True)
-
-    train_dirs = [f'{train_dirs_path}/{int(i)}' for i in subjects_train]
-    val_dirs = [f'{train_dirs_path}/{int(i)}' for i in subjects_val]
-
-    return train_dirs, val_dirs
+    if coarse:
+        np.save(f'{subject_dir}/X_baseline_coarse', X)
+        np.save(f'{subject_dir}/y_baseline_coarse', y)
+        np.save(f'{subject_dir}/t_baseline_coarse', t)
+    else:
+        np.save(f'{subject_dir}/X_baseline_fine', X)
+        np.save(f'{subject_dir}/y_baseline_fine', y)
+        np.save(f'{subject_dir}/t_baseline_fine', t)
 
 
 def main(args):
@@ -177,23 +152,12 @@ def main(args):
     val_sub_path = os.path.join(subjects_path, 'validation_subjects.txt')
     test_sub_path = os.path.join(subjects_path, 'test_subjects.txt')
 
-    if os.path.exists(train_sub_path) and os.path.exists(val_sub_path) \
-            and os.path.exists(test_sub_path):
-        with open(train_sub_path, 'r') as f:
-            train_dirs = f.read().splitlines()
-        with open(val_sub_path, 'r') as f:
-            val_dirs = f.read().splitlines()
-        with open(test_sub_path, 'r') as f:
-            test_dirs = f.read().splitlines()
-    else:
-        test_dirs = get_subject_dirs(os.path.join(subjects_path, 'test/'))
-        train_dirs, val_dirs = split_train_val(os.path.join(subjects_path,
-            'train/'), val_perc=0.2)
-
-        # Write the training, validation and test subjects to files
-        with open(train_sub_path,'w') as f: f.write('\n'.join(train_dirs))
-        with open(val_sub_path,'w') as f: f.write('\n'.join(val_dirs))
-        with open(test_sub_path,'w') as f: f.write('\n'.join(test_dirs))
+    with open(train_sub_path, 'r') as f:
+        train_dirs = f.read().splitlines()
+    with open(val_sub_path, 'r') as f:
+        val_dirs = f.read().splitlines()
+    with open(test_sub_path, 'r') as f:
+        test_dirs = f.read().splitlines()
 
     with open('nicu_los/config.json') as f:
         config = json.load(f)
@@ -207,7 +171,8 @@ def main(args):
     with mp.Pool() as pool:
         for _ in tqdm(pool.istarmap(create_baseline_datasets_per_subject,
             zip(subject_dirs, repeat(variables), repeat(stat_fns),
-                repeat(subseqs), repeat(args.pre_imputed)))):
+                repeat(subseqs), repeat(args.pre_imputed),
+                repeat(args.coarse)))):
             pass
 
 

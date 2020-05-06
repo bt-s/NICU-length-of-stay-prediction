@@ -62,7 +62,7 @@ def create_timeseries(variables, df_events, df_stay, df_notes=None):
     df_ts = df_ts.pivot(index='CHARTTIME', columns='VARIABLE',
             values='VALUE').sort_index(axis=0).reset_index()
 
-    # Make sure that the timeeries contains all variables
+    # Make sure that the timeseries contains all variables
     for v in variables:
         if v not in df_ts:
             df_ts[v] = np.nan
@@ -71,6 +71,12 @@ def create_timeseries(variables, df_events, df_stay, df_notes=None):
     # first row in the timeseries contain a value
     df_ts.WEIGHT.iloc[0] = get_first_valid_value_from_ts(df_ts, 'WEIGHT')
     df_ts.HEIGHT.iloc[0] = get_first_valid_value_from_ts(df_ts, 'HEIGHT')
+
+    # Make sure that there is a time stamp for each hour
+    df_ts = df_ts.set_index('CHARTTIME')
+    df_ts = df_ts.reindex(pd.date_range(start=df_ts.index[0], end=df_ts.index[-1], freq='3600S'))
+    df_ts['CHARTTIME'] = df_ts.index
+    df_ts.index = pd.RangeIndex(len(df_ts.index))
 
     # Add GA days to timeseries
     ga_days = df_stay.iloc[0].GA_DAYS

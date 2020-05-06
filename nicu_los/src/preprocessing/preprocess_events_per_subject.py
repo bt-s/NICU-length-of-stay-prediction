@@ -60,7 +60,6 @@ def clean_variables(df, cleaning_functions):
             print(f'Error: {e} in {fn.__name__}')
             exit()
 
-
     return df.loc[df.VALUE.notnull()]
 
 
@@ -152,7 +151,7 @@ def main(args):
         df_events = df_events[df_events.VALUE.notnull()]
 
         # Clean variables
-        df_events = clean_variables(df_events)
+        df_events = clean_variables(df_events, cleaning_functions)
 
         # Clean charttime -- we know from the format that the length should
         # always be 19

@@ -10,7 +10,7 @@ notes).
 
 __author__ = "Bas Straathof"
 
-import argparse, os, pickle, re, sys
+import argparse, csv, os, pickle, re, sys
 
 from datetime import datetime, timedelta
 from itertools import repeat
@@ -22,19 +22,19 @@ from word2number import w2n
 
 from nicu_los.src.utils.mimic_readers import MimicNICUReaders
 from nicu_los.src.utils.reg_exps import reg_exps
-from nicu_los.src.utils.utils import get_subject_dirs
+from nicu_los.src.utils.utils import get_subject_dirs, remove_subject_dir
 
 
 def parse_cl_args():
     """Parses CL arguments"""
     parser = argparse.ArgumentParser(
             description='Extract data from the MIMIC-III CSVs.')
-    parser.add_argument('-ip', '--input-path', type=str,
-            help='Path to MIMIC-III CSV files.', default='../../mimic/')
-    parser.add_argument('-op', '--output-path', type=str,
-            default='data/', help='Path to desired output directory.')
-    parser.add_argument('-v', '--verbose', type=int,
-            help='Info in console output (0 or 1).', default=1)
+    parser.add_argument('-ip', '--input-path', type=str, default='../../mimic',
+            help='Path to MIMIC-III CSV files.')
+    parser.add_argument('-op', '--output-path', type=str, default='data',
+            help='Path to desired output directory.')
+    parser.add_argument('-v', '--verbose', type=int, default=1,
+            help='Info in console output (0 or 1).')
 
     return parser.parse_args(sys.argv[1:])
 
@@ -418,7 +418,7 @@ def validate_events_and_notes_per_subject(df_stay, df_events, df_notes, stats):
     no_value = tot_events - len(df_events) - no_charttime
 
     # Make sure that if VALUEOM is not present that it is an empty string
-    df_events.VALUEUOM= df_events.VALUEUOM.fillna('').astype(str)
+    df_events.VALUEUOM = df_events.VALUEUOM.fillna('').astype(str)
 
     # Drop events that fall outside the intime-outtime interval
     mask = (intime <= df_events.CHARTTIME) & (df_events.CHARTTIME < outtime)

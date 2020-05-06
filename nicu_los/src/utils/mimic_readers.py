@@ -153,7 +153,7 @@ class MimicNICUReaders(object):
             df (pd.DataFrame): Dataframe of all labevents
         """
         self.v_print('...read LABEVENTS table...')
-        df = pd.read_csv(self.mimic_iii_path + 'LABEVENTS.csv')
+        df = pd.read_csv(os.path.join(self.mimic_iii_path, 'LABEVENTS.csv'))
 
         # Make sure that the time fields are datatime
         df.CHARTTIME = pd.to_datetime(df.CHARTTIME)

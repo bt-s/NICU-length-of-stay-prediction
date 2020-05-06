@@ -16,34 +16,124 @@
     "WEIGHT"
   ],
   "vars_to_itemid": {
-    "BILIRUBIN_DIRECT": [50883, 803],
-    "BILIRUBIN_INDIRECT": [50884, 3765],
-    "BLOOD_PRESSURE_DIASTOLIC": [8502, 8503, 8504, 8506, 8507],
-    "BLOOD_PRESSURE_SYSTOLIC": [3313, 3315, 3317, 3323, 3321],
-    "CAPILLARY_REFILL_RATE": [3348],
-    "FRACTION_INSPIRED_OXYGEN": [3420, 3422],
-    "HEART_RATE": [211],
-    "HEIGHT": [4188],
-    "OXYGEN_SATURATION": [834, 50817, 8498],
-    "PH": [50820, 51491, 860, 4753, 3839, 4202, 1673, 50831, 51094],
-    "RESPIRATORY_RATE": [3603],
-    "TEMPERATURE": [3655, 3654],
-    "WEIGHT": [3580, 3693, 3723, 4183]
+    "BILIRUBIN_DIRECT": [
+      50883,
+      803
+    ],
+    "BILIRUBIN_INDIRECT": [
+      50884,
+      3765
+    ],
+    "BLOOD_PRESSURE_DIASTOLIC": [
+      8502,
+      8503,
+      8504,
+      8506,
+      8507
+    ],
+    "BLOOD_PRESSURE_SYSTOLIC": [
+      3313,
+      3315,
+      3317,
+      3323,
+      3321
+    ],
+    "CAPILLARY_REFILL_RATE": [
+      3348
+    ],
+    "FRACTION_INSPIRED_OXYGEN": [
+      3420,
+      3422
+    ],
+    "HEART_RATE": [
+      211
+    ],
+    "HEIGHT": [
+      4188
+    ],
+    "OXYGEN_SATURATION": [
+      834,
+      50817,
+      8498
+    ],
+    "PH": [
+      50820,
+      51491,
+      860,
+      4753,
+      3839,
+      4202,
+      1673,
+      50831,
+      51094
+    ],
+    "RESPIRATORY_RATE": [
+      3603
+    ],
+    "TEMPERATURE": [
+      3655,
+      3654
+    ],
+    "WEIGHT": [
+      3580,
+      3693,
+      3723,
+      4183
+    ]
   },
   "valid_variable_ranges": {
-    "BILIRUBIN_DIRECT": {"MIN": 0, "MAX": 30},
-    "BILIRUBIN_INDIRECT": {"MIN": 0, "MAX": 30},
-    "BLOOD_PRESSURE_DIASTOLIC": {"MIN": 0, "MAX": 100},
-    "BLOOD_PRESSURE_SYSTOLIC": {"MIN": 0, "MAX": 170},
-    "CAPILLARY_REFILL_RATE": {"MIN": 0, "MAX": 1},
-    "FRACTION_INSPIRED_OXYGEN": {"MIN": 21, "MAX": 100},
-    "HEART_RATE": {"MIN": 0, "MAX": 400},
-    "HEIGHT": {"MIN": 0, "MAX": 70},
-    "OXYGEN_SATURATION": {"MIN": 0, "MAX": 100},
-    "PH": {"MIN": 6.5, "MAX": 8},
-    "RESPIRATORY_RATE": {"MIN": 0, "MAX": 150},
-    "TEMPERATURE": {"MIN": 25, "MAX": 40},
-    "WEIGHT": {"MIN": 0.4, "MAX": 7}
+    "BILIRUBIN_DIRECT": {
+      "MIN": 0,
+      "MAX": 30
+    },
+    "BILIRUBIN_INDIRECT": {
+      "MIN": 0,
+      "MAX": 30
+    },
+    "BLOOD_PRESSURE_DIASTOLIC": {
+      "MIN": 0,
+      "MAX": 100
+    },
+    "BLOOD_PRESSURE_SYSTOLIC": {
+      "MIN": 0,
+      "MAX": 170
+    },
+    "CAPILLARY_REFILL_RATE": {
+      "MIN": 0,
+      "MAX": 1
+    },
+    "FRACTION_INSPIRED_OXYGEN": {
+      "MIN": 21,
+      "MAX": 100
+    },
+    "HEART_RATE": {
+      "MIN": 0,
+      "MAX": 400
+    },
+    "HEIGHT": {
+      "MIN": 0,
+      "MAX": 70
+    },
+    "OXYGEN_SATURATION": {
+      "MIN": 0,
+      "MAX": 100
+    },
+    "PH": {
+      "MIN": 6.5,
+      "MAX": 8
+    },
+    "RESPIRATORY_RATE": {
+      "MIN": 0,
+      "MAX": 150
+    },
+    "TEMPERATURE": {
+      "MIN": 25,
+      "MAX": 40
+    },
+    "WEIGHT": {
+      "MIN": 0.4,
+      "MAX": 7
+    }
   },
   "normal_values": {
     "BILIRUBIN_DIRECT": 0.3,
@@ -110,50 +200,100 @@
   },
   "normalization_statistics": {
     "BILIRUBIN_DIRECT": {
-      "MEAN": 0.3846596725439722,
-      "STDEV": 0.4254546550154018
+      "MEAN": 0.38795776763923123,
+      "STDEV": 0.4995558586710365
     },
     "BILIRUBIN_INDIRECT": {
-      "MEAN": 4.9010934461361995,
-      "STDEV": 2.824223089848004
+      "MEAN": 4.982584593497432,
+      "STDEV": 2.812381172016427
     },
     "BLOOD_PRESSURE_DIASTOLIC": {
-      "MEAN": 39.108309000513515,
-      "STDEV": 8.114493944874106
+      "MEAN": 39.13395397181673,
+      "STDEV": 8.011003181471962
     },
     "BLOOD_PRESSURE_SYSTOLIC": {
-      "MEAN": 69.59015569037838,
-      "STDEV": 10.012570527114605
+      "MEAN": 69.71923292492932,
+      "STDEV": 9.815849535630784
     },
     "CAPILLARY_REFILL_RATE": {
-      "MEAN": 0.003619523175038485,
-      "STDEV": 0.06005349471116435
+      "MEAN": 0.002862964053129254,
+      "STDEV": 0.053430024236937636
     },
     "FRACTION_INSPIRED_OXYGEN": {
-      "MEAN": 43.80236274573302,
-      "STDEV": 33.67018872653128
+      "MEAN": 42.736647702881015,
+      "STDEV": 33.31736427220678
     },
     "GESTATIONAL_AGE_DAYS": {
-      "MEAN": 242.49503124070216,
-      "STDEV": 27.734242998771467
+      "MEAN": 243.05256969228694,
+      "STDEV": 26.617593109502263
     },
-    "HEART_RATE": {"MEAN": 154.5329314032791, "STDEV": 15.607817329264153},
-    "HEIGHT": {"MEAN": 42.58677511343553, "STDEV": 5.189574583791317},
+    "HEART_RATE": {
+      "MEAN": 154.56160044366436,
+      "STDEV": 15.280675936078941
+    },
+    "HEIGHT": {
+      "MEAN": 42.76117146049992,
+      "STDEV": 5.062059452521232
+    },
     "OXYGEN_SATURATION": {
-      "MEAN": 96.88316035169365,
-      "STDEV": 2.9739947478315476
+      "MEAN": 96.97391536971297,
+      "STDEV": 3.124490309473565
     },
-    "PH": {"MEAN": 7.335613503572523, "STDEV": 0.10391311626297137},
+    "PH": {
+      "MEAN": 7.334633762892922,
+      "STDEV": 0.1010160419178162
+    },
     "RESPIRATORY_RATE": {
-      "MEAN": 50.00599209171807,
-      "STDEV": 13.426764620087484
+      "MEAN": 49.62083616180486,
+      "STDEV": 13.044259897806146
     },
-    "TEMPERATURE": {"MEAN": 36.23113080684117, "STDEV": 0.8349749226548859},
-    "WEIGHT": {"MEAN": 2.0166945586177967, "STDEV": 0.7884782645619902}
+    "TEMPERATURE": {
+      "MEAN": 36.222509993379084,
+      "STDEV": 0.8963228330879673
+    },
+    "WEIGHT": {
+      "MEAN": 2.02761270333521,
+      "STDEV": 0.7704029817249678
+    }
   },
   "baseline_subsequences": [
-    [0, 10], [0, 25], [0, 50], [0, 100], [50, 100], [75, 100], [90, 100]
+    [
+      0,
+      10
+    ],
+    [
+      0,
+      25
+    ],
+    [
+      0,
+      50
+    ],
+    [
+      0,
+      100
+    ],
+    [
+      50,
+      100
+    ],
+    [
+      75,
+      100
+    ],
+    [
+      90,
+      100
+    ]
   ],
-  "stat_fns": ["get_first", "get_last", "np.min", "np.max", "np.mean", "np.std",
-	  "skew", "len"]
+  "stat_fns": [
+    "get_first",
+    "get_last",
+    "np.min",
+    "np.max",
+    "np.mean",
+    "np.std",
+    "skew",
+    "len"
+  ]
 }
