@@ -1,8 +1,9 @@
 #!/usr/bin/python3
 
-"""simple_lstm.py
+"""rnn.py
 
-Implementation of a simple LSTM model to predict the remaining length-of-stay.
+Script to run various types of Recurrent Neural Networks (RNNs) to predict the
+remaining length-of-stay.
 """
 
 __author__ = "Bas Straathof"
@@ -34,7 +35,7 @@ def parse_cl_args():
     parser.add_argument('--model-name', type=str, default='',
             help='The name of the model to be saved.')
     parser.add_argument('--model-type', type=str, default='lstm',
-            help='The model to be loaded. Right now "lstm" is supported .')
+            help='The model to be loaded. Either "lstm" or "gru".')
 
     parser.add_argument('--checkpoint-file', type=str, default="",
             help='File from which to load the model weights.')
@@ -43,11 +44,13 @@ def parse_cl_args():
 
     parser.add_argument('--batch-size', type=int, default=8,
             help='Training batch size.')
+    parser.add_argument('--coarse-targets', type=int, default=0,
+            help='Whether to use coarse target labels.')
     parser.add_argument('--epochs', type=int, default=100,
             help='Number of training epochs.')
-    parser.add_argument('--training-steps', type=int, default=2000,
+    parser.add_argument('--training-steps', type=int, default=20,
             help='Training steps per training epoch.')
-    parser.add_argument('--validation-steps', type=int, default=1000,
+    parser.add_argument('--validation-steps', type=int, default=10,
             help='Validation steps per training epoch.')
     parser.add_argument('--early-stopping', type=int, default=0,
             help=('Whether to use the early stopping callback. This number ' \
@@ -56,9 +59,17 @@ def parse_cl_args():
                     'previous one.'))
     parser.add_argument('--mask-indicator', type=int, default=1,
             help='Whether to use missinggness indicator mask variables.')
+
+    parser.add_argument('--dropout', type=float, default=0.0,
+            help='The amount of dropout to be used.')
+    parser.add_argument('--hidden-dimension', type=int, default=64,
+            help='The hidden dimension per layer of the RNN.')
+    parser.add_argument('--n-cells', type=int, default=1,
+            help='The number of cells in the RNN.')
+
     parser.add_argument('--training', type=int, default=1,
             help='Whether the current phase is the training phase.')
-    parser.add_argument('--enable-gpu', type=int, default=1,
+    parser.add_argument('--enable-gpu', type=int, default=0,
             help='Whether the GPU(s) should be enabled.')
 
     return parser.parse_args(argv[1:])
@@ -70,6 +81,7 @@ def main(args):
     else:
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
+    coarse_targets = args.coarse_targets
     training = args.training
     model_name = args.model_name
     model_type = args.model_type
@@ -87,6 +99,10 @@ def main(args):
         os.makedirs(checkpoints_dir)
 
     log_dir = model_path + '/logs/' + datetime.now().strftime('%Y%m%d-%H%M%S')
+
+    loss_log_dir = os.path.join(model_path, 'logs', model_name)
+    if not os.path.exists(loss_log_dir):
+        os.makedirs(loss_log_dir)
 
     mask = args.mask_indicator
     batch_size = args.batch_size
@@ -106,13 +122,19 @@ def main(args):
         if mask:
             variables = variables + ['mask_' + v for v in variables]
 
+    model_params = {
+        'input_dimension': len(variables),
+        'hidden_dimension': args.hidden_dimension,
+        'dropout': args.dropout,
+        'n_cells': args.n_cells}
+
     if args.enable_gpu:
         with strategy.scope():
-            model = construct_and_compile_model(model_type, checkpoint_file,
-                    checkpoints_dir)
+            model = construct_and_compile_model(model_type, model_name,
+                    checkpoint_file, checkpoints_dir, model_params)
     else:
-        model = construct_and_compile_model(model_type, checkpoint_file,
-                checkpoints_dir)
+        model = construct_and_compile_model(model_type, model_name,
+                checkpoint_file, checkpoints_dir, model_params)
 
     model.summary()
 
@@ -131,13 +153,15 @@ def main(args):
                 create_list_file(val_dirs, val_list_file)
 
         train_data = tf.data.Dataset.from_generator(data_generator,
-                args=[train_list_file, training_steps, batch_size, mask],
+                args=[train_list_file, training_steps, batch_size,
+                    "classification", coarse_targets, mask],
                 output_types=(tf.float32, tf.int16),
                 output_shapes=((batch_size, None, len(variables)),
                     (batch_size,)))
 
         val_data = tf.data.Dataset.from_generator(data_generator,
-                args=[val_list_file, validation_steps, batch_size, mask],
+                args=[val_list_file, validation_steps, batch_size,
+                    "classification", coarse_targets, mask],
                 output_types=(tf.float32, tf.int16),
                 output_shapes=((batch_size, None, len(variables)),
                     (batch_size,)))
@@ -146,7 +170,7 @@ def main(args):
         checkpoint_callback = ModelCheckpoint(checkpoint_path)
         tensorboard_callback = tf.keras.callbacks.TensorBoard(
                 log_dir=log_dir, histogram_freq=1)
-        logger_callback = CSVLogger(os.path.join(model_path, 'logs',
+        logger_callback = CSVLogger(os.path.join(model_path, 'logs', model_name,
             'logs.csv'))
         metrics_callback = MetricsCallback(model, train_data,
                 val_data, training_steps, validation_steps)
@@ -177,7 +201,8 @@ def main(args):
                 create_list_file(test_dirs, test_list_file)
 
         test_data = tf.data.Dataset.from_generator(data_generator,
-                args=[test_list_file, 0, batch_size, mask],
+                args=[test_list_file, 0, batch_size, "classification",
+                    coarse_targets, mask],
                 output_types=(tf.float32, tf.int16),
                 output_shapes=((None, len(variables)), ()))
 

@@ -21,7 +21,8 @@ from sklearn.metrics import accuracy_score, cohen_kappa_score, \
 
 from tensorflow.keras.callbacks import Callback
 from tensorflow.keras.models import Model
-from tensorflow.keras.layers import Dense, Dropout, Input, LSTM
+from tensorflow.keras.layers import Bidirectional, Dense, Dropout, GRU, Input, \
+        LSTM, Masking
 from tensorflow.keras.losses import SparseCategoricalCrossentropy
 from tensorflow.keras.optimizers import Adam
 
@@ -134,12 +135,15 @@ class TimeSeriesReader(object):
                          sequence length) combinations
         config (str): Path to the nicu_los config file
         ts_file (str): Name of the files containing the timeseries
+        coarse_targets (bool): Whether to use coarse targets
         mask (bool): Whether to use missingness indicator variables
     """
     def __init__(self, list_file, config='nicu_los/config.json',
-            ts_file='timeseries_normalized.csv', mask=True):
+            ts_file='timeseries_normalized.csv', coarse_targets=False,
+            mask=True):
         self.current_index = 0
         self.ts_file = ts_file
+        self.coarse_targets = coarse_targets
 
         with open(list_file, 'r') as f:
             self.data = f.readlines()
@@ -182,7 +186,11 @@ class TimeSeriesReader(object):
 
         X = ts[self.variables].to_numpy()
         y = ts.LOS_HOURS.iloc[-1]
-        t = ts.TARGET.iloc[-1]
+
+        if self.coarse_targets:
+            t = ts.TARGET_COARSE.iloc[-1]
+        else:
+            t = ts.TARGET_FINE.iloc[-1]
 
         return {'X': X, 'y': y, 't': t}
 
@@ -214,24 +222,63 @@ class TimeSeriesReader(object):
         return self.read_sequence(self.current_index)
 
 
-def construct_simple_lstm(input_dimension=28, dropout=0.3, hid_dimension=64):
+def construct_rnn(model_type='lstm', n_cells=1, input_dimension=28,
+        dropout=0.3, hid_dimension=64, model_name=""):
+    """Construct an RNN model (either LSTM or GRU)
+
+    Args:
+        n_cells (int): Number of RNN cells
+        input_dimension (int): Input dimension of the model
+        dropout (float): Amount of dropout to apply
+        hid_dimension (int): Dimension of the hidden layer (i.e. # of unit in
+                             the RNN cell)
+
+    Returns:
+        model (tf.keras.Model): Constructed RNN model
+    """
     X = Input(shape=(None, input_dimension))
     inputs = [X]
 
+    # Skip timestep if all  values of the input tensor are 0
+    X = Masking()(X)
+
     num_hid_units = hid_dimension
 
-    X = LSTM(activation='tanh', dropout=dropout,
-            recurrent_dropout=dropout,
-            return_sequences=False,
-            units=num_hid_units)(inputs)
+    for layer in range(n_cells - 1):
+        num_hid_units = num_hid_units // 2
 
-    if dropout > 0:
+        if model_type == 'lstm':
+            cell = LSTM(units=num_hid_units, activation='tanh',
+                    return_sequences=True, recurrent_dropout=dropout,
+                    dropout=dropout)
+        elif model_type == 'gru':
+            cell = GRU(units=num_hid_units, activation='tanh',
+                    return_sequences=True, recurrent_dropout=dropout,
+                    dropout=dropout)
+        else:
+            raise ValueError("Parameter 'model_type' should be one of " +
+                    "'lstm' or 'gru'.")
+
+        X = Bidirectional(cell)(X)
+
+    # There always has to be at least one cell
+    if model_type == 'lstm':
+        X = LSTM(activation='tanh', dropout=dropout, recurrent_dropout=dropout,
+                return_sequences=False, units=hid_dimension)(X)
+    elif model_type == 'gru':
+        X = GRU(activation='tanh', dropout=dropout, recurrent_dropout=dropout,
+                return_sequences=False, units=hid_dimension)(X)
+    else:
+        raise ValueError("Parameter 'model_type' should be one of " +
+                "'lstm' or 'gru'.")
+
+    if dropout:
         X = Dropout(dropout)(X)
 
     y = Dense(units=10, activation='softmax')(X)
     outputs = [y]
 
-    return Model(inputs=inputs, outputs=outputs, name='simple_lstm')
+    return Model(inputs=inputs, outputs=outputs, name=model_name)
 
 
 def sort_and_batch_shuffle(data, batch_size):
@@ -293,7 +340,7 @@ def zero_pad_timeseries(batch):
 
 
 def data_generator(list_file, steps, batch_size, task='classification',
-        mask=True, shuffle=True):
+        coarse_targets=False, mask=True, shuffle=True):
     """Data loader function
 
     Args:
@@ -302,6 +349,7 @@ def data_generator(list_file, steps, batch_size, task='classification',
         steps (int): Number of steps per epoch
         batch_size (int): Training batch size
         taks (str): One of 'classification'  and 'regression'
+        coarse_targets (bool): Whether to use coarse targets
         mask (bool): Whether to mask the variables
         shuffle (bool): Whether to shuffle the data
 
@@ -313,7 +361,8 @@ def data_generator(list_file, steps, batch_size, task='classification',
         OR (if task == 'classification'):
             t ():
     """
-    reader = TimeSeriesReader(list_file, mask=mask)
+    reader = TimeSeriesReader(list_file, coarse_targets=coarse_targets,
+            mask=mask)
 
     if steps:
         chunk_size = steps*batch_size
@@ -367,9 +416,27 @@ def create_list_file(subject_dirs, list_file_path,
                 f.write(f'{sd}, {row}\n')
 
 
-def construct_and_compile_model(model_type, checkpoint_file,
-        checkpoints_dir):
-    model = construct_simple_lstm()
+def construct_and_compile_model(model_type, model_name, checkpoint_file,
+        checkpoints_dir, model_params={}):
+    """Construct and compile a model of a specific type
+
+    Args:
+        model_type (str): The type of model to be constructed
+        checkpoint_file (str): Name of a checkpoint file
+        checkpoints_dir (str): Path to the checkpoints directory
+        model_params (dict): Possible hyper-parameters for the model to be
+                             constructed
+
+    Returns:
+        model (tf.keras.Model): Constructed and compiled model
+    """
+    n_cells = model_params['n_cells']
+    input_dimension = model_params['input_dimension']
+    dropout = model_params['dropout']
+    hid_dimension = model_params['hidden_dimension']
+
+    model = construct_rnn(model_type, n_cells, input_dimension, dropout,
+            hid_dimension, model_name)
 
     if checkpoint_file:
         model.load_weights(os.path.join(checkpoints_dir, checkpoint_file))
