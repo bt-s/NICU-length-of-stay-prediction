@@ -59,16 +59,16 @@ def get_baseline_datasets(subject_dirs, coarse_targets=False):
     y, t = np.zeros(tot_num_sub_seqs), np.zeros(tot_num_sub_seqs)
 
     if coarse_targets:
-        coarse_str = 'coarse'
+        target_str = 'coarse'
     else:
-        coarse_str = 'fine'
+        target_str = 'fine'
 
     cnt = 0
     for i, sd in enumerate(tqdm(subject_dirs)):
         cnt_old = cnt
-        x = np.load(os.path.join(sd, f'X_baseline_{coarse_str}.npy'))
-        yy = np.load(os.path.join(sd,f'y_baseline_{coarse_str}.npy'))
-        tt = np.load(os.path.join(sd,f't_baseline_{coarse_str}.npy'))
+        x = np.load(os.path.join(sd, f'X_baseline.npy'))
+        yy = np.load(os.path.join(sd,f'y_baseline.npy'))
+        tt = np.load(os.path.join(sd,f't_baseline_{target_str}.npy'))
 
         cnt += len(yy)
 
