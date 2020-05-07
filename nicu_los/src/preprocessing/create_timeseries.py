@@ -11,36 +11,42 @@ import argparse, json, os
 
 import pandas as pd
 import numpy as np
+import multiprocessing as mp
 
+from itertools import repeat
 from tqdm import tqdm
 from sys import argv
 
 from nicu_los.src.utils.utils import compute_ga_days_for_charttime, \
-        compute_remaining_los, get_subject_dirs, remove_subject_dir, \
-        round_up_to_hour
+        compute_remaining_los, get_subject_dirs, istarmap, \
+        remove_subject_dir, round_up_to_hour
 
 
 def parse_cl_args():
     """Parses CL arguments"""
     parser = argparse.ArgumentParser()
-    parser.add_argument('-sp', '--subjects-path', type=str, default='data/',
+    parser.add_argument('-sp', '--subjects-path', type=str, default='data',
             help='Path to subject directories.')
 
     return parser.parse_args(argv[1:])
 
 
-def create_timeseries(variables, df_events, df_stay, df_notes=None):
+def create_timeseries(variables, subject_dir):
     """Create timeseries from clinical events (and notes)
 
     Args:
         variables (dict): All variables to be present in the timeseries
-        df_events: Dataframe containing all clinical events of ICU stay
-        df_stay: Dataframe containing information about ICU stay
-        df_notes: Dataframe containing notes about ICU stay
+        subject_dir (list): List of subject directories
 
     Returns:
         df_ts: Dataframe containing the timesries of the ICU stay
     """
+    # Read the events dataframe
+    df_events = pd.read_csv(os.path.join(subject_dir, 'events.csv'))
+
+    # Read the admission dataframe
+    df_stay = pd.read_csv(os.path.join(subject_dir, 'stay.csv'))
+
     # If not hour on clock, round up charttime to nearest hour
     df_events.CHARTTIME = df_events.CHARTTIME.apply(
             lambda x: round_up_to_hour(x))
@@ -74,7 +80,8 @@ def create_timeseries(variables, df_events, df_stay, df_notes=None):
 
     # Make sure that there is a time stamp for each hour
     df_ts = df_ts.set_index('CHARTTIME')
-    df_ts = df_ts.reindex(pd.date_range(start=df_ts.index[0], end=df_ts.index[-1], freq='3600S'))
+    df_ts = df_ts.reindex(pd.date_range(start=df_ts.index[0],
+        end=df_ts.index[-1], freq='3600S'))
     df_ts['CHARTTIME'] = df_ts.index
     df_ts.index = pd.RangeIndex(len(df_ts.index))
 
@@ -92,7 +99,10 @@ def create_timeseries(variables, df_events, df_stay, df_notes=None):
     df_ts['TARGET_COARSE'] = df_ts['LOS_HOURS'].apply(lambda x: \
             los_hours_to_target(x, coarse=True))
 
-    return df_ts
+    if not df_ts.empty:
+        df_ts.to_csv(os.path.join(subject_dir, 'timeseries.csv'), index=False)
+    else:
+        remove_subject_dir(os.path.join(subject_dir))
 
 
 def get_first_valid_value_from_ts(ts, variable):
@@ -178,7 +188,6 @@ def los_hours_to_target(hours, coarse):
 
 def main(args):
     subjects_path = args.subjects_path
-    removed_subjects, tot_events, tot_events_kept = 0, 0, 0
 
     with open('nicu_los/config.json') as f:
         config = json.load(f)
@@ -187,26 +196,11 @@ def main(args):
     subject_dirs = get_subject_dirs(subjects_path)
     tot_subjects = len(subject_dirs)
 
-    for i, sd in enumerate(tqdm(subject_dirs)):
-        # Read the events dataframe
-        df_events = pd.read_csv(os.path.join(sd, 'events.csv'))
+    with mp.Pool() as pool:
+        for _ in tqdm(pool.istarmap(create_timeseries, zip(repeat(variables),
+            subject_dirs)), total=tot_subjects):
+            pass
 
-        # Read the admission dataframe
-        df_stay = pd.read_csv(os.path.join(sd, 'stay.csv'))
-
-        # Create the timeseries
-        df_ts = create_timeseries(variables, df_events, df_stay)
-
-        # Write timeseries to timeseries.csv if not empty, remove otherwise
-        if not df_ts.empty:
-            df_ts.to_csv(os.path.join(sd, 'timeseries.csv'), index=False)
-        else:
-            remove_subject_dir(os.path.join(sd))
-            removed_subjects += 1
-
-    print(f'Of the initial {tot_subjects} subjects, ' \
-            f'{tot_subjects-removed_subjects} remain that have ' \
-            f'non-empty time-series.\n')
 
 if __name__ == '__main__':
     main(parse_cl_args())
