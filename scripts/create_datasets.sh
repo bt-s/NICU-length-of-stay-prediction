@@ -16,7 +16,5 @@ python -m nicu_los.src.preprocessing.obtain_normalization_statistics \
   > logs/output_obtain_normalization_statistics
 python -m nicu_los.src.preprocessing.normalize_values \
   > logs/output_normalize_values
-python -m nicu_los.src.preprocessing.create_baseline_datasets -c 1 \
-  > logs/output_create_baseline_datasets
-python -m nicu_los.src.preprocessing.create_baseline_datasets -c 0 \
+python -m nicu_los.src.preprocessing.create_baseline_datasets \
   > logs/output_create_baseline_datasets
