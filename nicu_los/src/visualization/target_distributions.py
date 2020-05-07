@@ -23,7 +23,7 @@ from nicu_los.src.utils.visualization_utils import create_histogram
 def parse_cl_args():
     """Parses CL arguments"""
     parser = argparse.ArgumentParser()
-    parser.add_argument('-sp', '--subjects-path', type=str, default='data/',
+    parser.add_argument('-sp', '--subjects-path', type=str, default='data',
             help='Path to subject directories.')
     parser.add_argument('-pp', '--plots-path', type=str, default='plots/',
             help='Path to plots directory.')
@@ -34,8 +34,8 @@ def parse_cl_args():
 
 
 def main(args):
-    train_path = os.path.join(args.subjects_path, 'train/')
-    test_path = os.path.join(args.subjects_path, 'test/')
+    train_path = os.path.join(args.subjects_path, 'train')
+    test_path = os.path.join(args.subjects_path, 'test')
 
     if not (os.path.exists(train_path) or os.path.exists(test_path)):
         raise FileNotFoundError(

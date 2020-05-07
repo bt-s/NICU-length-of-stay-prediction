@@ -24,7 +24,7 @@ from nicu_los.src.utils.utils import get_subject_dirs
 def parse_cl_args():
     """Parses CL arguments"""
     parser = argparse.ArgumentParser()
-    parser.add_argument('-trp', '--train-path', type=str, default='data/train/',
+    parser.add_argument('-trp', '--train-path', type=str, default='data/train',
             help='Path to the train directories.')
 
     return parser.parse_args(argv[1:])
@@ -48,7 +48,7 @@ def get_normalization_stats_for_var(variable, train_dirs, config, q):
             'timeseries_imputed.csv'))
 
         # Append the values of the current variable
-        values = values + df_ts[variable].to_list()
+        values = values + df_ts[variable].tolist()
 
     print(f'{variable} MEAN: {np.mean(values)}')
     print(f'{variable} STDEV: {np.std(values)}')

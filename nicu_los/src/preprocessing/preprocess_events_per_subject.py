@@ -25,7 +25,7 @@ from nicu_los.src.utils.utils import get_subject_dirs, remove_subject_dir
 def parse_cl_args():
     """Parses CL arguments"""
     parser = argparse.ArgumentParser()
-    parser.add_argument('-sp', '--subjects-path', type=str, default='data/',
+    parser.add_argument('-sp', '--subjects-path', type=str, default='data',
             help='Path to subject directories.')
     parser.add_argument('-op', '--output-path', type=str,
             default='logs/variable_statistics.csv',

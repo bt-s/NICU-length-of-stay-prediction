@@ -28,7 +28,7 @@ def parse_cl_args():
     """Parses CL arguments"""
     parser = argparse.ArgumentParser()
     parser.add_argument('-sp', '--subjects-path', type=str,
-            default='data/',
+            default='data',
             help='Path to the subjects directories.')
     parser.add_argument('-mp', '--models-path', type=str,
             default='models/logistic_regression/',

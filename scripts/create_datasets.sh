@@ -10,9 +10,13 @@ python -m nicu_los.src.preprocessing.create_timeseries \
   > logs/output_create_timeseries
 python -m nicu_los.src.preprocessing.impute_values \
   > logs/output_impute_values
-python -m nicu_los.src.preprocessing.split_train_test \
-  > logs/output_split_train_test
+python -m nicu_los.src.preprocessing.split_dataset \
+  > logs/output_split_dataset
 python -m nicu_los.src.preprocessing.obtain_normalization_statistics \
   > logs/output_obtain_normalization_statistics
 python -m nicu_los.src.preprocessing.normalize_values \
   > logs/output_normalize_values
+python -m nicu_los.src.preprocessing.create_baseline_datasets -c 1 \
+  > logs/output_create_baseline_datasets
+python -m nicu_los.src.preprocessing.create_baseline_datasets -c 0 \
+  > logs/output_create_baseline_datasets

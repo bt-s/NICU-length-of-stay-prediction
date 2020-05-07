@@ -26,7 +26,7 @@ def parse_cl_args():
     """Parses CL arguments"""
     parser = argparse.ArgumentParser()
     parser.add_argument('-sp', '--subjects-path', type=str,
-            default='data/', help='Path to the subject directories.')
+            default='data', help='Path to the subject directories.')
     parser.add_argument('-mp', '--models-path', type=str,
             default='models/linear_regression/',
             help='Path to the models directory.')

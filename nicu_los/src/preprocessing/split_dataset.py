@@ -99,7 +99,8 @@ def main(args):
 
     print('...split the training set into training and validation...')
     train_dirs, val_dirs = split_data_set(os.path.join(subjects_path,
-        'train/'), args.val_perc)
+        'train'), args.val_perc)
+    test_dirs = get_subject_dirs(os.path.join(subjects_path, 'test'))
 
     print(f'There are {len(train_dirs)} train directories ' \
             f'and {len(val_dirs)} validation directories.')

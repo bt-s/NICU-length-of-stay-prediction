@@ -23,9 +23,9 @@ from nicu_los.src.utils.utils import get_subject_dirs
 def parse_cl_args():
     """Parses CL arguments"""
     parser = argparse.ArgumentParser()
-    parser.add_argument('-trp', '--train-path', type=str, default='data/train/',
+    parser.add_argument('-trp', '--train-path', type=str, default='data/train',
             help='Path to the train directories.')
-    parser.add_argument('-tep', '--test-path', type=str, default='data/test/',
+    parser.add_argument('-tep', '--test-path', type=str, default='data/test',
             help='Path to the testdirectories.')
 
     return parser.parse_args(argv[1:])
