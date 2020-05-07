@@ -29,12 +29,14 @@ from tensorflow.keras.optimizers import Adam
 from nicu_los.src.utils.utils import get_subject_dirs
 
 
-def get_baseline_datasets(subject_dirs, coarse_targets=False):
+def get_baseline_datasets(subject_dirs, coarse_targets=False,
+        pre_imputed=False):
     """Obtain baseline data sets
 
     Args:
         subject_dirs (list): List of subject directories
         coarse_targets (bool): Whether to use coarse targets
+        pre_imputed (bool): Whether to use features from pre-imputed data 
 
     Returns:
         X (np.ndarray): Features
@@ -63,12 +65,16 @@ def get_baseline_datasets(subject_dirs, coarse_targets=False):
     else:
         target_str = 'fine'
 
+    pi_str = ''
+    if pre_imputed:
+        pi_str = '_pre_imputed'
+
     cnt = 0
     for i, sd in enumerate(tqdm(subject_dirs)):
         cnt_old = cnt
-        x = np.load(os.path.join(sd, f'X_baseline.npy'))
-        yy = np.load(os.path.join(sd,f'y_baseline.npy'))
-        tt = np.load(os.path.join(sd,f't_baseline_{target_str}.npy'))
+        x = np.load(os.path.join(sd, f'X_baseline{pi_str}.npy'))
+        yy = np.load(os.path.join(sd,f'y_baselinepi_str.npy'))
+        tt = np.load(os.path.join(sd,f't_baseline_{target_str}pi_str.npy'))
 
         cnt += len(yy)
 

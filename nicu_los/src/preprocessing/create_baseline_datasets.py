@@ -29,7 +29,7 @@ def parse_cl_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('-sp', '--subjects-path', type=str, default='data',
             help='Path to subject directories.')
-    parser.add_argument('-pi', '--pre-imputed', type=int, default=0,
+    parser.add_argument('-pi', '--pre-imputed', type=bool, default=False,
             help='Whether to use pre-imputed time-series.')
 
     return parser.parse_args(argv[1:])
@@ -131,10 +131,14 @@ def create_baseline_datasets_per_subject(subject_dir, variables, stat_fns,
     for i in range(1, len(ts)):
         X[i] = compute_stats_for_subseqs(ts[0:i], variables, stat_fns, subseqs)
 
-    np.save(f'{subject_dir}/X_baseline', X)
-    np.save(f'{subject_dir}/y_baseline', y)
-    np.save(f'{subject_dir}/t_baseline_coarse', t_coarse)
-    np.save(f'{subject_dir}/t_baseline_fine', t_fine)
+    pi_str = ''
+    if pre_imputed:
+        pi_str = '_pre_imputed'
+
+    np.save(f'{subject_dir}/X_baseline{pi_str}', X)
+    np.save(f'{subject_dir}/y_baseline{pi_str}', y)
+    np.save(f'{subject_dir}/t_baseline_coarse{pi_str}', t_coarse)
+    np.save(f'{subject_dir}/t_baseline_fine{pi_str}', t_fine)
 
 
 def main(args):
