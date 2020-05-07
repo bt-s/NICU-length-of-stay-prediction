@@ -33,8 +33,6 @@ def parse_cl_args():
             help='Whether to use pre-imputed time-series.')
     parser.add_argument('-mn', '--model-name', type=str, default="",
             help='Name of the  model.')
-    parser.add_argument('-ct', '--coarse-targets', type=bool, default=False,
-            help='Whether to use coarse target labels.')
 
     return parser.parse_args(argv[1:])
 
@@ -54,9 +52,9 @@ def main(args):
         test_dirs = f.read().splitlines()
 
     # Get the data
-    X_train, y_train, _ = get_baseline_datasets(train_dirs, args.coarse_targets)
-    X_val, y_val, _ = get_baseline_datasets(val_dirs, args.coarse_targets)
-    X_test, y_test, _ = get_baseline_datasets(test_dirs, args.coarse_targets)
+    X_train, y_train, _ = get_baseline_datasets(train_dirs)
+    X_val, y_val, _ = get_baseline_datasets(val_dirs)
+    X_test, y_test, _ = get_baseline_datasets(test_dirs)
 
     if not pre_imputed:
         imputer = SimpleImputer(missing_values=np.nan, strategy='mean',
