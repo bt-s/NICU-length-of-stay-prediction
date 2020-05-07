@@ -16,8 +16,8 @@ import numpy as np
 from sys import argv
 from datetime import datetime
 
-from ..utils.evaluation_utils import evaluate_classification_model
-from ..utils.modelling_utils import get_train_val_test_baseline_sets
+from nicu_los.src.utils.modelling_utils import evaluate_classification_model, \
+        get_train_val_test_baseline_sets
 
 
 def parse_cl_args():
@@ -57,7 +57,6 @@ def main(args):
     # Get the mean and median
     mean = round(np.mean(y_train))
     median = round(np.median(y_train))
-    print(mean, median)
 
     v_print(f'- Predict mean')
     test_act = np.full(y_test.shape, mean)

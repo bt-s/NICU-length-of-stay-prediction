@@ -8,18 +8,19 @@ Implementation of a simple LSTM model to predict the remaining length-of-stay.
 __author__ = "Bas Straathof"
 
 import tensorflow as tf
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.callbacks import CSVLogger, EarlyStopping, \
-        ModelCheckpoint, TensorBoard
-from tensorflow.keras.losses import SparseCategoricalCrossentropy
 
 import argparse, json, os
 from sys import argv
 from datetime import datetime
 import numpy as np
 
-from nicu_los.src.utils.modelling_utils import create_list_file, \
-        data_generator, construct_simple_lstm, evaluate_classification_model
+import tensorflow as tf
+from tensorflow.keras.callbacks import CSVLogger, EarlyStopping, \
+        ModelCheckpoint, TensorBoard
+
+from nicu_los.src.utils.modelling_utils import construct_and_compile_model, \
+        create_list_file, data_generator, evaluate_classification_model, \
+        MetricsCallback
 
 
 def parse_cl_args():
@@ -27,58 +28,71 @@ def parse_cl_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--data-path', type=str, default='data',
             help='Path to the data directories.')
-    parser.add_argument( '--models-path', type=str,
-            default='models/simple_lstm',
-            help='Path to the simple LSTM models directory.')
-    parser.add_argument('--batch-size', type=int, default=8, help='Batch size.')
-    parser.add_argument('--mask-indicator', type=int, default=1,
-            help='Whether to use missinggness indicator mask variables.')
-    parser.add_argument('--training-steps', type=int, default=2000,
-            help='Training steps per epoch.')
-    parser.add_argument('--validation-steps', type=int, default=1000,
-            help='Validation steps per epoch.')
-    parser.add_argument('--epochs', type=int, default=100,
-            help='Epochs.')
-    parser.add_argument('--training', type=int, default=0,
-            help='Whether the current phase is the training phase.')
+    parser.add_argument( '--model-path', type=str,
+            default='models/rnn',
+            help='Path to the directory where the model should be saved.')
+    parser.add_argument('--model-name', type=str, default='',
+            help='The name of the model to be saved.')
+    parser.add_argument('--model-type', type=str, default='lstm',
+            help='The model to be loaded. Right now "lstm" is supported .')
+
     parser.add_argument('--checkpoint-file', type=str, default="",
             help='File from which to load the model weights.')
     parser.add_argument('--initial-epoch', type=int, default=0,
             help='The starting epoch if loading a checkpoint file.')
-    parser.add_argument('--model-name', type=str, default='',
-            help='The name of the model to be trained.')
+
+    parser.add_argument('--batch-size', type=int, default=8,
+            help='Training batch size.')
+    parser.add_argument('--epochs', type=int, default=100,
+            help='Number of training epochs.')
+    parser.add_argument('--training-steps', type=int, default=2000,
+            help='Training steps per training epoch.')
+    parser.add_argument('--validation-steps', type=int, default=1000,
+            help='Validation steps per training epoch.')
     parser.add_argument('--early-stopping', type=int, default=0,
-            help='Whether to use the early stopping callback.')
+            help=('Whether to use the early stopping callback. This number ' \
+                    'indicates the patience, i.e. the number of epochs that ' \
+                    'the validation loss is allowed to be lower than the '
+                    'previous one.'))
+    parser.add_argument('--mask-indicator', type=int, default=1,
+            help='Whether to use missinggness indicator mask variables.')
+    parser.add_argument('--training', type=int, default=1,
+            help='Whether the current phase is the training phase.')
+    parser.add_argument('--enable-gpu', type=int, default=1,
+            help='Whether the GPU(s) should be enabled.')
 
     return parser.parse_args(argv[1:])
 
 
 def main(args):
-    #strategy = tf.distribute.MirroredStrategy()
-    os.environ["CUDA_VISIBLE_DEVICES"] = "-1" # No GPU
+    if args.enable_gpu:
+        strategy = tf.distribute.MirroredStrategy()
+    else:
+        os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
     training = args.training
     model_name = args.model_name
+    model_type = args.model_type
     if training:
         print(f'Training {model_name}')
 
     data_path = args.data_path
-    models_path = args.models_path
-    if not os.path.exists(models_path):
-        os.makedirs(models_path)
+    model_path = args.model_path
+    if not os.path.exists(model_path):
+        os.makedirs(model_path)
 
-    checkpoints_dir = os.path.join(models_path, 'checkpoints')
+    checkpoint_file = args.checkpoint_file
+    checkpoints_dir = os.path.join(model_path, 'checkpoints')
     if not os.path.exists(checkpoints_dir):
         os.makedirs(checkpoints_dir)
 
-    log_dir = models_path + '/logs/' + datetime.now().strftime('%Y%m%d-%H%M%S')
+    log_dir = model_path + '/logs/' + datetime.now().strftime('%Y%m%d-%H%M%S')
 
     mask = args.mask_indicator
     batch_size = args.batch_size
     training_steps = args.training_steps
     validation_steps = args.validation_steps
     initial_epoch = args.initial_epoch
-    training = args.training
 
     checkpoint_path = os.path.join(checkpoints_dir, f'{model_name}-' + \
             f'batch{batch_size}-steps{training_steps}-epoch' + \
@@ -92,18 +106,13 @@ def main(args):
         if mask:
             variables = variables + ['mask_' + v for v in variables]
 
-    #with straItegy.scope():
-    # Construct the model
-    model = construct_simple_lstm()
-    if args.checkpoint_file:
-        model.load_weights(os.path.join(checkpoints_dir,
-            args.checkpoint_file))
-
-    # Compile the model
-    model.compile(
-            optimizer=Adam(),
-            loss=SparseCategoricalCrossentropy(),
-            metrics=['accuracy'])
+    if args.enable_gpu:
+        with strategy.scope():
+            model = construct_and_compile_model(model_type, checkpoint_file,
+                    checkpoints_dir)
+    else:
+        model = construct_and_compile_model(model_type, checkpoint_file,
+                checkpoints_dir)
 
     model.summary()
 
@@ -124,24 +133,29 @@ def main(args):
         train_data = tf.data.Dataset.from_generator(data_generator,
                 args=[train_list_file, training_steps, batch_size, mask],
                 output_types=(tf.float32, tf.int16),
-                output_shapes=((batch_size, None, len(variables)), (batch_size,)))
+                output_shapes=((batch_size, None, len(variables)),
+                    (batch_size,)))
 
         val_data = tf.data.Dataset.from_generator(data_generator,
                 args=[val_list_file, validation_steps, batch_size, mask],
                 output_types=(tf.float32, tf.int16),
-                output_shapes=((batch_size, None, len(variables)), (batch_size,)))
+                output_shapes=((batch_size, None, len(variables)),
+                    (batch_size,)))
 
-        # Callbacks
+        # Get callbacks
         checkpoint_callback = ModelCheckpoint(checkpoint_path)
-        tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir,
-                histogram_freq=1)
-        logger_callback = CSVLogger(os.path.join(models_path, 'logs',
+        tensorboard_callback = tf.keras.callbacks.TensorBoard(
+                log_dir=log_dir, histogram_freq=1)
+        logger_callback = CSVLogger(os.path.join(model_path, 'logs',
             'logs.csv'))
-        callbacks = [checkpoint_callback, logger_callback, tensorboard_callback]
+        metrics_callback = MetricsCallback(model, train_data,
+                val_data, training_steps, validation_steps)
+        callbacks = [checkpoint_callback, logger_callback, metrics_callback,
+                tensorboard_callback]
 
         if args.early_stopping:
-            early_stopping_callback = EarlyStopping(monitor='val_loss', min_delta=0,
-                    patience=0)
+            early_stopping_callback = EarlyStopping(monitor='val_loss',
+                    min_delta=0, patience=args.early_stopping)
             callbacks.append(early_stopping_callback)
 
         # Fit the model
