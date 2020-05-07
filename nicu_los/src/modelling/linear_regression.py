@@ -12,7 +12,6 @@ import argparse, os, pickle
 import numpy as np
 
 from sys import argv
-from datetime import datetime
 
 from sklearn.linear_model import LinearRegression
 from sklearn.impute import SimpleImputer
@@ -32,10 +31,10 @@ def parse_cl_args():
             help='Path to the models directory.')
     parser.add_argument('-pi', '--pre-imputed', type=int, default=0,
             help='Whether to use pre-imputed time-series.')
-    parser.add_argument('-sm', '--save-model', type=bool, default=True,
-            help='Whether to save the model.')
-    parser.add_argument('-v', '--verbose', type=int,
-            help='Level of verbosity in console output.', default=1)
+    parser.add_argument('-mn', '--model-name', type=str, default="",
+            help='Name of the  model.')
+    parser.add_argument('-ct', '--coarse-targets', type=bool, default=False,
+            help='Whether to use coarse target labels.')
 
     return parser.parse_args(argv[1:])
 
@@ -43,11 +42,9 @@ def parse_cl_args():
 def main(args):
     if not os.path.exists(args.models_path):
         os.makedirs(args.models_path)
-    v_print = print if args.verbose else lambda *a, **k: None
     pre_imputed = args.pre_imputed
     data_path = args.subjects_path
-    save_model = args.save_model
-    now = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+    model_name = args.model_name
 
     with open(f'{data_path}/training_subjects.txt', 'r') as f:
         train_dirs = f.read().splitlines()
@@ -57,9 +54,9 @@ def main(args):
         test_dirs = f.read().splitlines()
 
     # Get the data
-    X_train, y_train, _ = get_baseline_datasets(train_dirs)
-    X_val, y_val, _ = get_baseline_datasets(val_dirs)
-    X_test, y_test, _ = get_baseline_datasets(test_dirs)
+    X_train, y_train, _ = get_baseline_datasets(train_dirs, args.coarse_targets)
+    X_val, y_val, _ = get_baseline_datasets(val_dirs, args.coarse_targets)
+    X_test, y_test, _ = get_baseline_datasets(test_dirs, args.coarse_targets)
 
     if not pre_imputed:
         imputer = SimpleImputer(missing_values=np.nan, strategy='mean',
@@ -78,7 +75,7 @@ def main(args):
     X_train = np.concatenate((X_train, X_val))
     y_train = np.hstack((y_train, y_val))
 
-    v_print(f'Fitting the Linear Regression model')
+    print(f'Fitting the Linear Regression model')
     clf = LinearRegression(n_jobs=-1)
 
     # Fit the model
@@ -88,7 +85,7 @@ def main(args):
     train_preds = clf.predict(X_train)
     train_preds = np.maximum(train_preds, np.min(y_train))
     # Evaluate the model on the test set
-    v_print('Evaluate on the training set')
+    print('Evaluate on the training set')
     train_scores = evaluate_regression_model(y_train, train_preds)
 
     # Predict on the testing set
@@ -96,12 +93,12 @@ def main(args):
     test_preds = np.maximum(test_preds, np.min(y_train))
 
     # Evaluate the model on the test set
-    v_print('Evaluate on the test set')
+    print('Evaluate on the test set')
     test_scores = evaluate_regression_model(y_test, test_preds)
 
     if save_model:
         # Save the results
-        f_name = os.path.join(args.models_path, f'results_{now}.txt')
+        f_name = os.path.join(args.models_path, f'results_{model_name}.txt')
 
         with open(f_name, "a") as f:
             f.write(f'LinearRegression:\n')
@@ -114,7 +111,7 @@ def main(args):
 
         # Save the model
         f_name = os.path.join(args.models_path,
-                f'model_{now}.pkl')
+                f'model_{model_name}.pkl')
 
         with open(f_name, 'wb') as f:
             pickle.dump(clf, f)

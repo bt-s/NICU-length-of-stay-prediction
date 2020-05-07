@@ -28,11 +28,12 @@ from tensorflow.keras.optimizers import Adam
 from nicu_los.src.utils.utils import get_subject_dirs
 
 
-def get_baseline_datasets(subject_dirs):
+def get_baseline_datasets(subject_dirs, coarse_targets=False):
     """Obtain baseline data sets
 
     Args:
         subject_dirs (list): List of subject directories
+        coarse_targets (bool): Whether to use coarse targets
 
     Returns:
         X (np.ndarray): Features
@@ -56,12 +57,17 @@ def get_baseline_datasets(subject_dirs):
     X = np.zeros((tot_num_sub_seqs, len(variables)*len(sub_seqs)*len(stat_fns)))
     y, t = np.zeros(tot_num_sub_seqs), np.zeros(tot_num_sub_seqs)
 
+    if coarse_targets:
+        coarse_str = 'coarse'
+    else:
+        coarse_str = 'fine'
+
     cnt = 0
     for i, sd in enumerate(tqdm(subject_dirs)):
         cnt_old = cnt
-        x = np.load(os.path.join(sd,'X_baseline.npy'))
-        yy = np.load(os.path.join(sd,'y_baseline.npy'))
-        tt = np.load(os.path.join(sd,'t_baseline.npy'))
+        x = np.load(os.path.join(sd, f'X_baseline_{coarse_str}.npy'))
+        yy = np.load(os.path.join(sd,f'y_baseline_{coarse_str}.npy'))
+        tt = np.load(os.path.join(sd,f't_baseline_{coarse_str}.npy'))
 
         cnt += len(yy)
 

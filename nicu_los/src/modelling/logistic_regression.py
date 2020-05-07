@@ -12,7 +12,6 @@ import argparse, os, pickle
 import numpy as np
 
 from sys import argv
-from datetime import datetime
 
 from sklearn.linear_model import LogisticRegression
 from sklearn.impute import SimpleImputer
@@ -33,14 +32,14 @@ def parse_cl_args():
     parser.add_argument('-mp', '--models-path', type=str,
             default='models/logistic_regression/',
             help='Path to the models directory.')
-    parser.add_argument('-pi', '--pre-imputed', type=int, default=0,
+    parser.add_argument('-pi', '--pre-imputed', type=bool, default=False,
             help='Whether to use pre-imputed time-series.')
-    parser.add_argument('-sm', '--save-model', type=bool, default=True,
-            help='Whether to save the model.')
+    parser.add_argument('-mn', '--model-name', type=str, default="",
+            help='Name of the  model.')
     parser.add_argument('-gs', '--grid-search', type=bool, default=False,
             help='Whether to do a grid-search.')
-    parser.add_argument('-v', '--verbose', type=int,
-            help='Level of verbosity in console output.', default=1)
+    parser.add_argument('-ct', '--coarse-targets', type=bool, default=False,
+            help='Whether to use coarse target labels.')
 
     return parser.parse_args(argv[1:])
 
@@ -50,9 +49,8 @@ def main(args):
         os.makedirs(args.models_path)
 
     data_path = args.subjects_path
-    save_model = args.save_model
+    model_name = args.model_name
     pre_imputed = args.pre_imputed
-    now = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
 
     with open(f'{data_path}/training_subjects.txt', 'r') as f:
         train_dirs = f.read().splitlines()
@@ -62,9 +60,9 @@ def main(args):
         test_dirs = f.read().splitlines()
 
     # Get the data
-    X_train, _, y_train = get_baseline_datasets(train_dirs)
-    X_val, _, y_val = get_baseline_datasets(val_dirs)
-    X_test, _, y_test = get_baseline_datasets(test_dirs)
+    X_train, _, y_train = get_baseline_datasets(train_dirs, args.coarse_targets)
+    X_val, _, y_val = get_baseline_datasets(val_dirs, args.coarse_targets)
+    X_test, _, y_test = get_baseline_datasets(test_dirs, args.coarse_targets)
 
     if not pre_imputed:
         imputer = SimpleImputer(missing_values=np.nan, strategy='mean',
@@ -126,8 +124,8 @@ def main(args):
     # Evaluate the model on the test set
     test_scores = evaluate_classification_model(y_test, test_act)
 
-    if save_model:
-        f_name = os.path.join(args.models_path, f'results_{now}.txt')
+    if model_name:
+        f_name = os.path.join(args.models_path, f'results_{model_name}.txt')
 
         with open(f_name, "a") as f:
             f.write(f'Best LR model: {clf.best_estimator_}:\n')
@@ -139,7 +137,7 @@ def main(args):
                 f.write(f'\t\t{k}: {v}\n')
 
         f_name = os.path.join(args.models_path,
-                f'best_model_{now}.pkl')
+                f'best_model_{model_name}.pkl')
 
         with open(f_name, 'wb') as f:
             pickle.dump(clf, f)
