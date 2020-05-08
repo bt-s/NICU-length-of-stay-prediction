@@ -29,10 +29,15 @@ def parse_cl_args():
     parser.add_argument('-mp', '--models-path', type=str,
             default='models/linear_regression/',
             help='Path to the models directory.')
-    parser.add_argument('-pi', '--pre-imputed', type=int, default=0,
-            help='Whether to use pre-imputed time-series.')
     parser.add_argument('-mn', '--model-name', type=str, default="",
             help='Name of the  model.')
+
+    parser.add_argument('--pre-imputed', dest='pre_imputed',
+            action='store_true')
+    parser.add_argument('--not-pre-imputed', dest='pre_imputed',
+            action='store_false')
+
+    parser.set_defaults(pre_imputed=False)
 
     return parser.parse_args(argv[1:])
 

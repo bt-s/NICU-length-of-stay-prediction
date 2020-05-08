@@ -44,8 +44,6 @@ def parse_cl_args():
 
     parser.add_argument('--batch-size', type=int, default=8,
             help='Training batch size.')
-    parser.add_argument('--coarse-targets', type=int, default=0,
-            help='Whether to use coarse target labels.')
     parser.add_argument('--epochs', type=int, default=100,
             help='Number of training epochs.')
     parser.add_argument('--training-steps', type=int, default=20,
@@ -57,8 +55,6 @@ def parse_cl_args():
                     'indicates the patience, i.e. the number of epochs that ' \
                     'the validation loss is allowed to be lower than the '
                     'previous one.'))
-    parser.add_argument('--mask-indicator', type=int, default=1,
-            help='Whether to use missinggness indicator mask variables.')
 
     parser.add_argument('--dropout', type=float, default=0.0,
             help='The amount of dropout to be used.')
@@ -67,10 +63,26 @@ def parse_cl_args():
     parser.add_argument('--n-cells', type=int, default=1,
             help='The number of cells in the RNN.')
 
-    parser.add_argument('--training', type=int, default=1,
-            help='Whether the current phase is the training phase.')
-    parser.add_argument('--enable-gpu', type=int, default=0,
-            help='Whether the GPU(s) should be enabled.')
+    parser.add_argument('--mask-indicatior', dest='mask_indicator',
+            action='store_true')
+    parser.add_argument('--no-mask-indicator', dest='mask_indicator',
+            action='store_false')
+
+    parser.add_argument('--training', dest='training', action='store_true')
+    parser.add_argument('--testing', dest='training', action='store_false')
+
+    parser.add_argument('--coarse-targets', dest='coarse_targets',
+            action='store_true')
+    parser.add_argument('--no-coarse-targets', dest='coarse_targets',
+            action='store_false')
+
+    parser.add_argument('--enable-gpu', dest='enable_gpu',
+            action='store_true')
+    parser.add_argument('--disable-gpu', dest='enable_gpu',
+            action='store_false')
+
+    parser.set_defaults(enable_gpu=False, training=True, coarse_targets=True,
+            mask_indicator=True)
 
     return parser.parse_args(argv[1:])
 

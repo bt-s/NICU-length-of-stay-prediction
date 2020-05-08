@@ -142,3 +142,4 @@ conda-env/
 .idea
 *.swp
 *.swn
+*.swm

@@ -40,8 +40,10 @@ def parse_cl_args():
     parser.add_argument('--no-grid-search', dest='grid_search',
             action='store_false')
 
-    parser.add_argument('--coarse-targets', dest='coarse_targets', action='store_true')
-    parser.add_argument('--no-coarse-targets', dest='coarse_targets', action='store_false')
+    parser.add_argument('--coarse-targets', dest='coarse_targets',
+            action='store_true')
+    parser.add_argument('--no-coarse-targets', dest='coarse_targets',
+            action='store_false')
 
     parser.add_argument('--pre-imputed', dest='pre_imputed',
             action='store_true')
