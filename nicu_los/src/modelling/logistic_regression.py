@@ -32,14 +32,23 @@ def parse_cl_args():
     parser.add_argument('-mp', '--models-path', type=str,
             default='models/logistic_regression/',
             help='Path to the models directory.')
-    parser.add_argument('-pi', '--pre-imputed', type=bool, default=False,
-            help='Whether to use pre-imputed time-series.')
     parser.add_argument('-mn', '--model-name', type=str, default="",
             help='Name of the  model.')
-    parser.add_argument('-gs', '--grid-search', type=bool, default=False,
-            help='Whether to do a grid-search.')
-    parser.add_argument('-ct', '--coarse-targets', type=bool, default=False,
-            help='Whether to use coarse target labels.')
+
+    parser.add_argument('--grid-search', dest='grid_search',
+            action='store_true')
+    parser.add_argument('--no-grid-search', dest='grid_search',
+            action='store_false')
+
+    parser.add_argument('--coarse-targets', dest='coarse_targets', action='store_true')
+    parser.add_argument('--no-coarse-targets', dest='coarse_targets', action='store_false')
+
+    parser.add_argument('--pre-imputed', dest='pre_imputed',
+            action='store_true')
+    parser.add_argument('--not-pre-imputed', dest='pre_imputed',
+            action='store_false')
+
+    parser.set_defaults(pre_imputed=False, grid_search=True, coarse_targets=True)
 
     return parser.parse_args(argv[1:])
 
@@ -48,9 +57,16 @@ def main(args):
     if not os.path.exists(args.models_path):
         os.makedirs(args.models_path)
 
+    coarse_targets = args.coarse_targets
     data_path = args.subjects_path
+    grid_search = args.grid_search
     model_name = args.model_name
     pre_imputed = args.pre_imputed
+
+    print(f'=> Training {model_name}')
+    print(f'=> Pre-imputed features: {pre_imputed}')
+    print(f'=> Coarse targets: {coarse_targets}')
+    print(f'=> Grid search: {grid_search}')
 
     with open(f'{data_path}/training_subjects.txt', 'r') as f:
         train_dirs = f.read().splitlines()
@@ -60,11 +76,15 @@ def main(args):
         test_dirs = f.read().splitlines()
 
     # Get the data
-    X_train, _, y_train = get_baseline_datasets(train_dirs, args.coarse_targets)
-    X_val, _, y_val = get_baseline_datasets(val_dirs, args.coarse_targets)
-    X_test, _, y_test = get_baseline_datasets(test_dirs, args.coarse_targets)
+    X_train, _, y_train = get_baseline_datasets(train_dirs, coarse_targets,
+            pre_imputed)
+    X_val, _, y_val = get_baseline_datasets(val_dirs, coarse_targets,
+            pre_imputed)
+    X_test, _, y_test = get_baseline_datasets(test_dirs, coarse_targets,
+            pre_imputed)
 
     if not pre_imputed:
+        print('=> Imputing missing data')
         imputer = SimpleImputer(missing_values=np.nan, strategy='mean',
                 fill_value='constant', verbose=0, copy=True)
         X_train = imputer.fit_transform(X_train)
@@ -72,6 +92,7 @@ def main(args):
         X_test = imputer.transform(X_test)
 
     # Normalize
+    print('=> Normalizing the data')
     scaler = StandardScaler()
     X_train = scaler.fit_transform(X_train)
     X_val = scaler.transform(X_val)
@@ -90,12 +111,16 @@ def main(args):
             solver='saga')
 
     # Define the parameter grid
-    if args.grid_search:
+    if grid_search:
         regularizers = ['l1', 'l2']
         Cs = [1.0, 0.1, 0.01, 0.001, 0.0001, 0.00001 ]
+        print(f'=> Doing a grid search with the following regularizers and Cs.')
+        print(f'=> Regularizers: {regularizers} .')
+        print(f'=> Cs: {Cs} .')
     else:
         regularizers = ['l2']
         Cs = [1.0]
+        print(f'=> Fitting with regularizer={regularizers} and C={Cs}.')
 
     param_grid = dict(C=Cs, penalty=regularizers)
 
@@ -104,6 +129,7 @@ def main(args):
             scoring=make_scorer(cohen_kappa_score), verbose=3)
 
     # Fit the GridSearchCV to find the optimal estimator
+    print(f'=> Fitting the Logistic Regression model')
     clf.fit(X, y)
 
     # Extract the best estimator and fit again on all available training data
@@ -119,12 +145,15 @@ def main(args):
     test_act = np.argmax(test_preds, axis=1)
 
     # Evaluate the model on the training set
+    print('=> Evaluate fitted model on the training set')
     train_scores = evaluate_classification_model(y, train_act)
 
     # Evaluate the model on the test set
+    print('=> Evaluate fitted model on the test set')
     test_scores = evaluate_classification_model(y_test, test_act)
 
     if model_name:
+        print('=> Saving the model')
         f_name = os.path.join(args.models_path, f'results_{model_name}.txt')
 
         with open(f_name, "a") as f:
@@ -136,8 +165,7 @@ def main(args):
             for k, v in test_scores.items():
                 f.write(f'\t\t{k}: {v}\n')
 
-        f_name = os.path.join(args.models_path,
-                f'best_model_{model_name}.pkl')
+        f_name = os.path.join(args.models_path, f'best_model_{model_name}.pkl')
 
         with open(f_name, 'wb') as f:
             pickle.dump(clf, f)
@@ -145,4 +173,3 @@ def main(args):
 
 if __name__ == '__main__':
     main(parse_cl_args())
-
