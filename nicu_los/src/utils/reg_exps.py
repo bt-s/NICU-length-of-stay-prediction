@@ -85,11 +85,17 @@ re_d_over_d = re.compile('^(\d+)/(\d+)$')
 # Regex to capture laboratory values
 re_lab_vals = re.compile('^(\d+(\.\d*)?|\.\d+)$')
 
+# Regex to capture anonymized piece of text
+re_anon = re.compile('\[\*\*.*?\*\*\]')
+
+# Regex to capture underscores
+re_under = re.compile('_')
+
 # Dictionary containing all regular expressions
 reg_exps = {'re_ga': re_ga, 're_cga': re_cga, 're_dd': re_dd, 're_dol': re_dol,
         're_anon_dd_p': re_anon_dd_p, 're_d_d_slash': re_d_d_slash,
         're_d_d_dash': re_d_d_dash, 're_dd_d': re_dd_d, 're_false': re_false,
         're_not_allowed': re_not_allowed, 're_splitter': re_splitter,
         're_trans_filter': re_trans_filter, 're_d_over_d': re_d_over_d,
-        're_lab_vals': re_lab_vals}
+        're_lab_vals': re_lab_vals, 're_anon': re_anon, 're_under': re_under}
 
