@@ -73,8 +73,8 @@ def get_baseline_datasets(subject_dirs, coarse_targets=False,
     for i, sd in enumerate(tqdm(subject_dirs)):
         cnt_old = cnt
         x = np.load(os.path.join(sd, f'X_baseline{pi_str}.npy'))
-        yy = np.load(os.path.join(sd,f'y_baselinepi_str.npy'))
-        tt = np.load(os.path.join(sd,f't_baseline_{target_str}pi_str.npy'))
+        yy = np.load(os.path.join(sd, f'y_baseline{pi_str}.npy'))
+        tt = np.load(os.path.join(sd, f't_baseline_{target_str}{pi_str}.npy'))
 
         cnt += len(yy)
 
