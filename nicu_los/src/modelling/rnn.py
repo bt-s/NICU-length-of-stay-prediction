@@ -11,9 +11,11 @@ __author__ = "Bas Straathof"
 import tensorflow as tf
 
 import argparse, json, os
+import numpy as np
+
 from sys import argv
 from datetime import datetime
-import numpy as np
+from tqdm import tqdm
 
 import tensorflow as tf
 from tensorflow.keras.callbacks import CSVLogger, EarlyStopping, \
@@ -21,7 +23,7 @@ from tensorflow.keras.callbacks import CSVLogger, EarlyStopping, \
 
 from nicu_los.src.utils.modelling_utils import construct_and_compile_model, \
         create_list_file, data_generator, evaluate_classification_model, \
-        MetricsCallback
+        MetricsCallback, TimeSeriesReader
 
 
 def parse_cl_args():
@@ -44,11 +46,11 @@ def parse_cl_args():
 
     parser.add_argument('--batch-size', type=int, default=8,
             help='Training batch size.')
-    parser.add_argument('--epochs', type=int, default=100,
+    parser.add_argument('--epochs', type=int, default=20,
             help='Number of training epochs.')
-    parser.add_argument('--training-steps', type=int, default=20,
+    parser.add_argument('--training-steps', type=int, default=2500,
             help='Training steps per training epoch.')
-    parser.add_argument('--validation-steps', type=int, default=10,
+    parser.add_argument('--validation-steps', type=int, default=1000,
             help='Validation steps per training epoch.')
     parser.add_argument('--early-stopping', type=int, default=0,
             help=('Whether to use the early stopping callback. This number ' \
@@ -89,16 +91,24 @@ def parse_cl_args():
 
 def main(args):
     if args.enable_gpu:
+        print('=> Using GPU(s)')
         strategy = tf.distribute.MirroredStrategy()
     else:
+        print('=> Using CPU(s)')
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
     coarse_targets = args.coarse_targets
-    training = args.training
     model_name = args.model_name
     model_type = args.model_type
+
+    early_stopping = args.early_stopping
+    training = args.training
+
     if training:
-        print(f'Training {model_name}')
+        print(f'=> Training {model_name}') 
+        print(f'=> Early stopping: {early_stopping}')
+    else:
+        print(f'=> Evaluating {model_name}') 
 
     data_path = args.data_path
     model_path = args.model_path
@@ -110,17 +120,24 @@ def main(args):
     if not os.path.exists(checkpoints_dir):
         os.makedirs(checkpoints_dir)
 
-    log_dir = model_path + '/logs/' + datetime.now().strftime('%Y%m%d-%H%M%S')
+    if training:
+        log_dir = os.path.join(model_path, 'logs', model_name)
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
 
-    loss_log_dir = os.path.join(model_path, 'logs', model_name)
-    if not os.path.exists(loss_log_dir):
-        os.makedirs(loss_log_dir)
+        log_dir_tb = os.path.join(log_dir, datetime.now().strftime('%Y%m%d-%H%M%S'))
+        if not os.path.exists(log_dir_tb):
+            os.makedirs(log_dir_tb)
 
     mask = args.mask_indicator
-    batch_size = args.batch_size
     training_steps = args.training_steps
     validation_steps = args.validation_steps
     initial_epoch = args.initial_epoch
+    batch_size = args.batch_size
+
+    print(f'=> Coarse targets: {coarse_targets}')
+    print(f'=> Using mask: {mask}')
+    print(f'=> Batch size: {batch_size}')
 
     checkpoint_path = os.path.join(checkpoints_dir, f'{model_name}-' + \
             f'batch{batch_size}-steps{training_steps}-epoch' + \
@@ -181,7 +198,7 @@ def main(args):
         # Get callbacks
         checkpoint_callback = ModelCheckpoint(checkpoint_path)
         tensorboard_callback = tf.keras.callbacks.TensorBoard(
-                log_dir=log_dir, histogram_freq=1)
+                log_dir=log_dir_tb, histogram_freq=1)
         logger_callback = CSVLogger(os.path.join(model_path, 'logs', model_name,
             'logs.csv'))
         metrics_callback = MetricsCallback(model, train_data,
@@ -189,12 +206,12 @@ def main(args):
         callbacks = [checkpoint_callback, logger_callback, metrics_callback,
                 tensorboard_callback]
 
-        if args.early_stopping:
+        if early_stopping:
             early_stopping_callback = EarlyStopping(monitor='val_loss',
                     min_delta=0, patience=args.early_stopping)
             callbacks.append(early_stopping_callback)
 
-        # Fit the model
+        print(f'=> Fitting the model')
         model.fit(
             train_data,
             validation_data=val_data,
@@ -206,6 +223,9 @@ def main(args):
 
     else:
         test_list_file = os.path.join(data_path, 'test_list.txt')
+        batch_size = 8 
+        steps = 2000
+        shuffle = False
 
         if not os.path.exists(test_list_file):
             with open(f'{data_path}/test_subjects.txt', 'r') as f:
@@ -213,17 +233,25 @@ def main(args):
                 create_list_file(test_dirs, test_list_file)
 
         test_data = tf.data.Dataset.from_generator(data_generator,
-                args=[test_list_file, 0, batch_size, "classification",
-                    coarse_targets, mask],
+                args=[test_list_file, steps, batch_size, "classification",
+                    coarse_targets, mask, shuffle],
                 output_types=(tf.float32, tf.int16),
-                output_shapes=((None, len(variables)), ()))
+                output_shapes=((batch_size, None, len(variables)),
+                    (batch_size,)))
 
-        y_true = []
-        y_pred = []
-        for batch, (x, y) in enumerate(test_data):
+        y_true, y_pred = [], []
+
+        # Get the number of sequences by instantiating the test reader
+        test_reader = TimeSeriesReader(test_list_file, coarse_targets=coarse_targets,
+                mask=mask)
+        n_sequences = test_reader.get_number_of_sequences()
+        
+        for batch, (x, y) in enumerate(tqdm(test_data, total=n_sequences/batch_size)):
+            if batch > n_sequences/batch_size:
+                break
+
             y_pred.append(np.argmax(model.predict_on_batch(x), axis=1))
             y_true.append(y.numpy())
-
 
         y_pred = np.concatenate(y_pred).ravel()
         y_true = np.concatenate(y_true).ravel()

@@ -370,22 +370,13 @@ def data_generator(list_file, steps, batch_size, task='classification',
     reader = TimeSeriesReader(list_file, coarse_targets=coarse_targets,
             mask=mask)
 
-    if steps:
-        chunk_size = steps*batch_size
-    else:
-        chunk_size = reader.get_number_of_sequences()
-        cnt = 0
+    chunk_size = steps*batch_size
 
     while True:
         if shuffle and reader.current_index == 0:
             reader.random_shuffle(seed=42)
 
         remaining = chunk_size
-        if not steps:
-            if cnt == 1:
-                break
-            else:
-                cnt +=1
 
         while remaining > 0:
             current_size = min(chunk_size, remaining)
@@ -466,7 +457,7 @@ class MetricsCallback(Callback):
         self.validation_steps = validation_steps
 
     def on_epoch_end(self, epoch, logs=None):
-        print('\nPredict on training data:\n')
+        print('\n=> Predict on training data:\n')
         y_true, y_pred = [], []
         for batch, (x, y) in enumerate(self.training_data):
             if batch > self.training_steps:
@@ -478,7 +469,7 @@ class MetricsCallback(Callback):
         evaluate_classification_model(np.concatenate(y_true, axis=0),
                 np.concatenate(y_pred, axis=0))
 
-        print('\nPredict on validation data:\n')
+        print('\n=> Predict on validation data:\n')
         y_true, y_pred = [], []
         for batch, (x, y) in enumerate(self.validation_data):
             if batch > self.validation_steps:
