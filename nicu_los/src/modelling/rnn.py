@@ -151,8 +151,14 @@ def main(args):
         if mask:
             variables = variables + ['mask_' + v for v in variables]
 
+    if coarse_targets:
+        output_dimension = 3
+    else:
+        output_dimension = 10
+
     model_params = {
         'input_dimension': len(variables),
+        'output_dimension': output_dimension,
         'hidden_dimension': args.hidden_dimension,
         'dropout': args.dropout,
         'n_cells': args.n_cells}

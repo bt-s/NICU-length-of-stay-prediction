@@ -228,13 +228,14 @@ class TimeSeriesReader(object):
         return self.read_sequence(self.current_index)
 
 
-def construct_rnn(model_type='lstm', n_cells=1, input_dimension=28,
-        dropout=0.3, hid_dimension=64, model_name=""):
+def construct_rnn(input_dimension, output_dimension, model_type='lstm',
+        n_cells=1, dropout=0.3, hid_dimension=64, model_name=""):
     """Construct an RNN model (either LSTM or GRU)
 
     Args:
-        n_cells (int): Number of RNN cells
         input_dimension (int): Input dimension of the model
+        output_dimension (int): Output dimension of the model
+        n_cells (int): Number of RNN cells
         dropout (float): Amount of dropout to apply
         hid_dimension (int): Dimension of the hidden layer (i.e. # of unit in
                              the RNN cell)
@@ -281,7 +282,7 @@ def construct_rnn(model_type='lstm', n_cells=1, input_dimension=28,
     if dropout:
         X = Dropout(dropout)(X)
 
-    y = Dense(units=10, activation='softmax')(X)
+    y = Dense(units=output_dimension, activation='softmax')(X)
     outputs = [y]
 
     return Model(inputs=inputs, outputs=outputs, name=model_name)
@@ -429,11 +430,12 @@ def construct_and_compile_model(model_type, model_name, checkpoint_file,
     """
     n_cells = model_params['n_cells']
     input_dimension = model_params['input_dimension']
+    output_dimension = model_params['output_dimension']
     dropout = model_params['dropout']
     hid_dimension = model_params['hidden_dimension']
 
-    model = construct_rnn(model_type, n_cells, input_dimension, dropout,
-            hid_dimension, model_name)
+    model = construct_rnn(input_dimension, output_dimension, model_type,
+            n_cells, dropout, hid_dimension, model_name)
 
     if checkpoint_file:
         model.load_weights(os.path.join(checkpoints_dir, checkpoint_file))

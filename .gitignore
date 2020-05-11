@@ -143,3 +143,4 @@ conda-env/
 *.swp
 *.swn
 *.swm
+mycert.pem
