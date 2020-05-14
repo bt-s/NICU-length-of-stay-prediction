@@ -435,9 +435,9 @@ class MetricsCallback(Callback):
                 np.concatenate(y_pred, axis=0))
 
 
-    def construct_channel_wise_rnn(input_dimension, output_dimension,
-            model_type='lstm_cw', n_cells=1, dropout=0.0, hid_dimension=16,
-            size_coef=8, model_name=""):
+def construct_channel_wise_rnn(input_dimension, output_dimension,
+        model_type='lstm_cw', n_cells=1, dropout=0.0, hid_dimension=16,
+        size_coef=8, model_name=""):
     """Construct an RNN model (either LSTM or GRU)
 
     Args:
