@@ -23,7 +23,9 @@ from tensorflow.keras.callbacks import CSVLogger, EarlyStopping, \
 
 from nicu_los.src.utils.modelling import construct_and_compile_model, \
         create_list_file, data_generator, evaluate_classification_model, \
-        MetricsCallback, TimeSeriesReader
+        MetricsCallback
+        
+from nicu_los.src.utils.readers import TimeSeriesReader
 
 
 def parse_cl_args():
