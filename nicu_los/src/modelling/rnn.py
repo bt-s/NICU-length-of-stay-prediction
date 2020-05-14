@@ -22,8 +22,8 @@ from tensorflow.keras.callbacks import CSVLogger, EarlyStopping, \
         ModelCheckpoint, TensorBoard
 
 from nicu_los.src.utils.modelling import construct_and_compile_model, \
-        create_list_file, data_generator, evaluate_classification_model, \
-        MetricsCallback
+        create_list_file, data_generator, MetricsCallback
+from nicu_los.src.utils.evaluation import evaluate_classification_model
         
 from nicu_los.src.utils.readers import TimeSeriesReader
 

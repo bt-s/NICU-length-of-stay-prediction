@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-"""modelling_utils.py
+"""modelling.py
 
 Various utility functions for modelling
 """
@@ -9,15 +9,10 @@ __author__ = "Bas Straathof"
 
 import errno, json, os, random
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
 from tqdm import tqdm
-
-from sklearn.metrics import accuracy_score, cohen_kappa_score, \
-        confusion_matrix, f1_score, mean_absolute_error, mean_squared_error, \
-        plot_confusion_matrix, precision_score, recall_score, roc_auc_score
 
 from tensorflow.keras.callbacks import Callback
 from tensorflow.keras.models import Model
@@ -28,6 +23,75 @@ from tensorflow.keras.optimizers import Adam
 
 from nicu_los.src.utils.utils import get_subject_dirs
 from nicu_los.src.utils.readers import TimeSeriesReader 
+from nicu_los.src.utils.evaluation import evaluate_classification_model
+
+
+def create_list_file(subject_dirs, list_file_path,
+        ts_fname='timeseries_normalized.csv'):
+    """Create a file containing a list of paths to timeseries data frames
+
+    Args:
+        subject_dirs (list): List of subject directories
+        list_file_path (str): Path to the list file
+        ts_fname (str): Name of the timeseries file
+    """
+    with open(list_file_path, 'a') as f:
+        for i, sd in enumerate(tqdm(subject_dirs)):
+            ts = pd.read_csv(os.path.join(sd, ts_fname))
+            for row in range(1, len(ts)+1):
+                f.write(f'{sd}, {row}\n')
+
+
+def data_generator(list_file, steps, batch_size, task='classification',
+        coarse_targets=False, mask=True, shuffle=True):
+    """Data loader function
+
+    Args:
+        list_file (str): Path to a file that contains a list of paths to
+                         timeseries
+        steps (int): Number of steps per epoch
+        batch_size (int): Training batch size
+        taks (str): One of 'classification'  and 'regression'
+        coarse_targets (bool): Whether to use coarse targets
+        mask (bool): Whether to mask the variables
+        shuffle (bool): Whether to shuffle the data
+
+    Yields:
+        X (np.ndarray): Features corresponding to one data batch
+
+        EITHER (if task == 'regression'):
+            y ():
+        OR (if task == 'classification'):
+            t ():
+    """
+    reader = TimeSeriesReader(list_file, coarse_targets=coarse_targets,
+            mask=mask)
+
+    chunk_size = steps*batch_size
+
+    while True:
+        if shuffle and reader.current_index == 0:
+            reader.random_shuffle(seed=42)
+
+        remaining = chunk_size
+
+        while remaining > 0:
+            current_size = min(chunk_size, remaining)
+            remaining -= current_size
+
+            data = reader.read_chunk(current_size)
+
+            (Xs, ys, ts) = sort_and_batch_shuffle(data, batch_size)
+
+            for i in range(0, current_size, batch_size):
+                X = zero_pad_timeseries(Xs[i:i + batch_size])
+                y = ys[i:i+batch_size]
+                t = ts[i:i+batch_size]
+
+                if task == 'regression':
+                    yield X, y
+                else:
+                    yield X, t
 
 
 def get_baseline_datasets(subject_dirs, coarse_targets=False,
@@ -95,66 +159,6 @@ def get_baseline_datasets(subject_dirs, coarse_targets=False,
     return X, y, t
 
 
-def construct_rnn(input_dimension, output_dimension, model_type='lstm',
-        n_cells=1, dropout=0.3, hid_dimension=64, model_name=""):
-    """Construct an RNN model (either LSTM or GRU)
-
-    Args:
-        input_dimension (int): Input dimension of the model
-        output_dimension (int): Output dimension of the model
-        n_cells (int): Number of RNN cells
-        dropout (float): Amount of dropout to apply
-        hid_dimension (int): Dimension of the hidden layer (i.e. # of unit in
-                             the RNN cell)
-
-    Returns:
-        model (tf.keras.Model): Constructed RNN model
-    """
-    X = Input(shape=(None, input_dimension))
-    inputs = [X]
-
-    # Skip timestep if all  values of the input tensor are 0
-    X = Masking()(X)
-
-    num_hid_units = hid_dimension
-
-    for layer in range(n_cells - 1):
-        num_hid_units = num_hid_units // 2
-
-        if model_type == 'lstm':
-            cell = LSTM(units=num_hid_units, activation='tanh',
-                    return_sequences=True, recurrent_dropout=dropout,
-                    dropout=dropout)
-        elif model_type == 'gru':
-            cell = GRU(units=num_hid_units, activation='tanh',
-                    return_sequences=True, recurrent_dropout=dropout,
-                    dropout=dropout)
-        else:
-            raise ValueError("Parameter 'model_type' should be one of " +
-                    "'lstm' or 'gru'.")
-
-        X = Bidirectional(cell)(X)
-
-    # There always has to be at least one cell
-    if model_type == 'lstm':
-        X = LSTM(activation='tanh', dropout=dropout, recurrent_dropout=dropout,
-                return_sequences=False, units=hid_dimension)(X)
-    elif model_type == 'gru':
-        X = GRU(activation='tanh', dropout=dropout, recurrent_dropout=dropout,
-                return_sequences=False, units=hid_dimension)(X)
-    else:
-        raise ValueError("Parameter 'model_type' should be one of " +
-                "'lstm' or 'gru'.")
-
-    if dropout:
-        X = Dropout(dropout)(X)
-
-    y = Dense(units=output_dimension, activation='softmax')(X)
-    outputs = [y]
-
-    return Model(inputs=inputs, outputs=outputs, name=model_name)
-
-
 def sort_and_batch_shuffle(data, batch_size):
     """Sort the data set and shuffle the batches
 
@@ -213,72 +217,64 @@ def zero_pad_timeseries(batch):
     return batch
 
 
-def data_generator(list_file, steps, batch_size, task='classification',
-        coarse_targets=False, mask=True, shuffle=True):
-    """Data loader function
+def construct_rnn(input_dimension, output_dimension, model_type='lstm',
+        n_cells=1, dropout=0.3, hid_dimension=64, model_name=""):
+    """Construct an RNN model (either LSTM or GRU)
 
     Args:
-        list_file (str): Path to a file that contains a list of paths to
-                         timeseries
-        steps (int): Number of steps per epoch
-        batch_size (int): Training batch size
-        taks (str): One of 'classification'  and 'regression'
-        coarse_targets (bool): Whether to use coarse targets
-        mask (bool): Whether to mask the variables
-        shuffle (bool): Whether to shuffle the data
+        input_dimension (int): Input dimension of the model
+        output_dimension (int): Output dimension of the model
+        n_cells (int): Number of RNN cells
+        dropout (float): Amount of dropout to apply
+        hid_dimension (int): Dimension of the hidden layer (i.e. # of unit in
+                             the RNN cell)
 
-    Yields:
-        X (np.ndarray): Features corresponding to one data batch
-
-        EITHER (if task == 'regression'):
-            y ():
-        OR (if task == 'classification'):
-            t ():
+    Returns:
+        model (tf.keras.Model): Constructed RNN model
     """
-    reader = TimeSeriesReader(list_file, coarse_targets=coarse_targets,
-            mask=mask)
+    X = Input(shape=(None, input_dimension))
+    inputs = [X]
 
-    chunk_size = steps*batch_size
+    # Skip timestep if all  values of the input tensor are 0
+    X = Masking()(X)
 
-    while True:
-        if shuffle and reader.current_index == 0:
-            reader.random_shuffle(seed=42)
+    num_hid_units = hid_dimension
 
-        remaining = chunk_size
+    for layer in range(n_cells - 1):
+        num_hid_units = num_hid_units // 2
 
-        while remaining > 0:
-            current_size = min(chunk_size, remaining)
-            remaining -= current_size
+        if model_type == 'lstm':
+            cell = LSTM(units=num_hid_units, activation='tanh',
+                    return_sequences=True, recurrent_dropout=dropout,
+                    dropout=dropout)
+        elif model_type == 'gru':
+            cell = GRU(units=num_hid_units, activation='tanh',
+                    return_sequences=True, recurrent_dropout=dropout,
+                    dropout=dropout)
+        else:
+            raise ValueError("Parameter 'model_type' should be one of " +
+                    "'lstm' or 'gru'.")
 
-            data = reader.read_chunk(current_size)
+        X = Bidirectional(cell)(X)
 
-            (Xs, ys, ts) = sort_and_batch_shuffle(data, batch_size)
+    # There always has to be at least one cell
+    if model_type == 'lstm':
+        X = LSTM(activation='tanh', dropout=dropout, recurrent_dropout=dropout,
+                return_sequences=False, units=hid_dimension)(X)
+    elif model_type == 'gru':
+        X = GRU(activation='tanh', dropout=dropout, recurrent_dropout=dropout,
+                return_sequences=False, units=hid_dimension)(X)
+    else:
+        raise ValueError("Parameter 'model_type' should be one of " +
+                "'lstm' or 'gru'.")
 
-            for i in range(0, current_size, batch_size):
-                X = zero_pad_timeseries(Xs[i:i + batch_size])
-                y = ys[i:i+batch_size]
-                t = ts[i:i+batch_size]
+    if dropout:
+        X = Dropout(dropout)(X)
 
-                if task == 'regression':
-                    yield X, y
-                else:
-                    yield X, t
+    y = Dense(units=output_dimension, activation='softmax')(X)
+    outputs = [y]
 
-
-def create_list_file(subject_dirs, list_file_path,
-        ts_fname='timeseries_normalized.csv'):
-    """Create a file containing a list of paths to timeseries data frames
-
-    Args:
-        subject_dirs (list): List of subject directories
-        list_file_path (str): Path to the list file
-        ts_fname (str): Name of the timeseries file
-    """
-    with open(list_file_path, 'a') as f:
-        for i, sd in enumerate(tqdm(subject_dirs)):
-            ts = pd.read_csv(os.path.join(sd, ts_fname))
-            for row in range(1, len(ts)+1):
-                f.write(f'{sd}, {row}\n')
+    return Model(inputs=inputs, outputs=outputs, name=model_name)
 
 
 def construct_and_compile_model(model_type, model_name, checkpoint_file,
@@ -350,62 +346,4 @@ class MetricsCallback(Callback):
         evaluate_classification_model(np.concatenate(y_true, axis=0),
                 np.concatenate(y_pred, axis=0))
 
-
-def mean_absolute_perc_error(y_true, y_pred):
-    return np.mean(np.abs((y_true - y_pred) / (y_true + 0.1))) * 100
-
-
-def evaluate_classification_model(y_true, y_pred, verbose=1):
-    kappa = cohen_kappa_score(y_true, y_pred, weights='linear')
-    acc = accuracy_score(y_true, y_pred)
-    precision = precision_score(y_true, y_pred, average='weighted')
-    recall = recall_score(y_true, y_pred, average='weighted')
-    f1 = f1_score(y_true, y_pred, average='weighted')
-    cm = confusion_matrix(y_true, y_pred)
-
-    if verbose:
-        print(f'Accuracy: {acc}')
-        print(f'Linear Cohen Kappa Score: {kappa}')
-        print(f'Precision: {precision}')
-        print(f'Recall: {recall}')
-        print(f'Confusion matrix:\n{cm}')
-
-    return {"accuracy": acc, 'kappa': kappa, 'precision': precision,
-            'recall': recall, 'cm': cm}
-
-
-def evaluate_regression_model(y_true, y_pred, verbose=1):
-    mad = mean_absolute_error(y_true, y_pred)
-    mse = mean_squared_error(y_true, y_pred)
-    rmse = np.sqrt(mse)
-    mape = mean_absolute_perc_error(y_true, y_pred)
-
-    if verbose:
-        print(f'Mean Absolute Deviation (MAD): {mad}')
-        print(f'Mean Squared Error (MSE): {mse}')
-        print(f'Root Mean Squared Error (RMSE): {rmse}')
-        print(f'Mean Aboslute Perentage Error (MAPE): {mape}')
-
-    return {'mad': mad, 'mse': mse, 'rmse': rmse, 'mape': mape}
-
-
-def get_confusion_matrix(model, X, y, save_plot='', class_names=['0-1',
-    '1-2', '2-3', '3-4', '4-5', '5-6', '6-7', '7-8', '8-14', '14+']):
-    titles_options = [("Confusion matrix, without normalization", None),
-                    ("Normalized confusion matrix", 'true')]
-    for title, normalize in titles_options:
-        disp = plot_confusion_matrix(model, X, y,
-                                    display_labels=class_names,
-                                    cmap=plt.cm.Blues,
-                                    normalize=normalize)
-        disp.ax_.set_title(title)
-
-        if save_plot:
-            if normalize: save_plot += '_normalized'
-            plt.savefig(save_plot, format="pdf", bbox_inches='tight',
-                    pad_inches=0)
-            plt.close()
-        else:
-            plt.show()
-            plt.close()
 

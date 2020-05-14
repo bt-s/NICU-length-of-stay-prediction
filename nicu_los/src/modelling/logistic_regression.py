@@ -19,8 +19,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import GridSearchCV, PredefinedSplit
 from sklearn.metrics import make_scorer, cohen_kappa_score
 
-from nicu_los.src.utils.modelling import evaluate_classification_model, \
-        get_baseline_datasets
+from nicu_los.src.utils.modelling import get_baseline_datasets
+from nicu_los.src.utils.evaluation import evaluate_classification_model
 
 
 def parse_cl_args():

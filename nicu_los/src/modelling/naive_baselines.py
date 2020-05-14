@@ -16,8 +16,9 @@ import numpy as np
 from sys import argv
 from datetime import datetime
 
-from nicu_los.src.utils.modelling import evaluate_classification_model, \
-        evaluate_regression_model, get_baseline_datasets
+from nicu_los.src.utils.modelling import get_baseline_datasets
+from nicu_los.src.utils.evaluation import evaluate_classification_model, \
+        evaluate_regression_model
 
 
 def parse_cl_args():
