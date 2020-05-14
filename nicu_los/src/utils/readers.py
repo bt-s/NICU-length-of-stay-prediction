@@ -5,7 +5,7 @@
 __author__ = "Bas Straathof"
 
 import pandas as pd
-import os
+import json, os, random
 
 
 class MimicNICUReaders(object):
