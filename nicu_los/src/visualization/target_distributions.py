@@ -87,25 +87,23 @@ def main(args):
 
     # Create the coarse buckets histogram
     create_histogram(input_data=[los_targets_coarse,
-        los_remaining_targets_coarse], xlabel='Buckets',
-        ylabel='Frequency', rwidth=0.5, legend=['LOS (coarse)',
-            'Remaining LOS (coarse)'], xticks=xticks_coarse,
-            save_plot=(os.path.join(args.plots_path,
-                'normalized_frequency_of_the_target_buckets_coarse')))
+        los_remaining_targets_coarse], xlabel='Buckets', ylabel='Frequency',
+        rwidth=0.5, legend=['LOS', 'Remaining LOS'], xticks=xticks_coarse,
+        save_plot=(os.path.join(args.plots_path,
+            'normalized_frequency_of_the_target_buckets_coarse.pdf')))
 
     # Create the fine buckets histogram
-    create_histogram(input_data=[los_targets_fine,
-        los_remaining_targets_fine], xlabel='Buckets',
-        ylabel='Frequency', rwidth=0.5, legend=['LOS (fine)',
-            'Remaining LOS (fine)'], xticks=xticks_fine,
+    create_histogram(input_data=[los_targets_fine, los_remaining_targets_fine], 
+            xlabel='Buckets', ylabel='Frequency', rwidth=0.5,
+            legend=['LOS', 'Remaining LOS'], xticks=xticks_fine, 
             save_plot=(os.path.join(args.plots_path,
-                'normalized_frequency_of_the_target_buckets_fine')))
+                'normalized_frequency_of_the_target_buckets_fine.pdf')))
 
     # Create the LOS hours histogram
     create_histogram(input_data=[los_hours, los_remaining_hours],
             xlabel='Hours', ylabel='Frequency', rwidth=1,
             legend=['LOS', 'Remaining LOS'], save_plot=(os.path.join(
-                args.plots_path, 'normalized_frequency_of_the_LOS_in_hours')))
+                args.plots_path, 'normalized_frequency_of_the_LOS_in_hours.pdf')))
 
 
 if __name__ == '__main__':
