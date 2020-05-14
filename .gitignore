@@ -143,3 +143,5 @@ conda-env/
 *.swp
 *.swn
 *.swm
+*.swl
+/cnn-test
