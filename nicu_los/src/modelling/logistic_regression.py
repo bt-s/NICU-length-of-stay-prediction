@@ -19,21 +19,20 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import GridSearchCV, PredefinedSplit
 from sklearn.metrics import make_scorer, cohen_kappa_score
 
-from nicu_los.src.utils.modelling_utils import evaluate_classification_model, \
-        get_baseline_datasets
+from nicu_los.src.utils.modelling import get_baseline_datasets
+from nicu_los.src.utils.evaluation import evaluate_classification_model
 
 
 def parse_cl_args():
     """Parses CL arguments"""
     parser = argparse.ArgumentParser()
     parser.add_argument('-sp', '--subjects-path', type=str,
-            default='data',
-            help='Path to the subjects directories.')
+            default='data', help='Path to the subjects directories.')
     parser.add_argument('-mp', '--models-path', type=str,
             default='models/logistic_regression/',
             help='Path to the models directory.')
     parser.add_argument('-mn', '--model-name', type=str, default="",
-            help='Name of the  model.')
+            help='Name of the model.')
 
     parser.add_argument('--grid-search', dest='grid_search',
             action='store_true')

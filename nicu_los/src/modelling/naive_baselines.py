@@ -3,8 +3,8 @@
 """naive_baselines.py
 
 Script to test two naive baselines:
-    (1) Always predicting the mean
-    (2) Always predicting the median
+    (1) Always predict the mean
+    (2) Always predict the median
 """
 
 __author__ = "Bas Straathof"
@@ -16,40 +16,68 @@ import numpy as np
 from sys import argv
 from datetime import datetime
 
-from nicu_los.src.utils.modelling_utils import evaluate_classification_model, \
-        get_train_val_test_baseline_sets
+from nicu_los.src.utils.modelling import get_baseline_datasets
+from nicu_los.src.utils.evaluation import evaluate_classification_model, \
+        evaluate_regression_model
 
 
 def parse_cl_args():
     """Parses CL arguments"""
     parser = argparse.ArgumentParser()
-    parser.add_argument('-sp', '--baseline-data-path', type=str,
-            default='data/baseline_features/',
-            help='Path to baseline features directories.')
+    parser.add_argument('-sp', '--subjects-path', type=str,
+            default='data', help='Path to the subjects directories.')
     parser.add_argument('-mp', '--models-path', type=str,
             default='models/naive_baselines/',
             help='Path to the models directory.')
-    parser.add_argument('-sm', '--save-model', type=bool, default=True,
-            help='Whether to save the model.')
-    parser.add_argument('-v', '--verbose', type=int,
-            help='Level of verbosity in console output.', default=1)
+    parser.add_argument('-mn', '--model-name', type=str, default="",
+            help='Name of the model.')
+    parser.add_argument('--model-task', type=str, default='classification',
+            help='Task; either "classification" or "regression".')
+
+    parser.add_argument('--coarse-targets', dest='coarse_targets',
+            action='store_true')
+    parser.add_argument('--no-coarse-targets', dest='coarse_targets',
+            action='store_false')
+
+    parser.set_defaults(coarse_targets=True)
 
     return parser.parse_args(argv[1:])
 
 
 def main(args):
-    v_print = print if args.verbose else lambda *a, **k: None
-
     if not os.path.exists(args.models_path):
         os.makedirs(args.models_path)
-    data_path = args.baseline_data_path
-    save_model = args.save_model
-    now = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
 
-    v_print(f'Naive model: classification')
-    # Get the targets
-    _, y_train, _, y_val, _, y_test = \
-            get_train_val_test_baseline_sets(data_path, task='classification')
+    data_path = args.subjects_path
+    model_name = args.model_name
+    model_task = args.model_task
+    coarse_targets = args.coarse_targets
+
+    with open(f'{data_path}/training_subjects.txt', 'r') as f:
+        train_dirs = f.read().splitlines()
+    with open(f'{data_path}/validation_subjects.txt', 'r') as f:
+        val_dirs = f.read().splitlines()
+    with open(f'{data_path}/test_subjects.txt', 'r') as f:
+        test_dirs = f.read().splitlines()
+
+    print(f'=> Naive model: {model_name}')
+    if model_task == 'classification':
+        _, _, y_train = get_baseline_datasets(train_dirs, coarse_targets,
+                targets_only=True)
+        _, _, y_val = get_baseline_datasets(val_dirs, coarse_targets,
+                targets_only=True)
+        _, _, y_test = get_baseline_datasets(test_dirs, coarse_targets,
+                targets_only=True)
+    elif model_task == 'regression':
+        _, y_train, _ = get_baseline_datasets(train_dirs, coarse_targets,
+                targets_only=True)
+        _, y_val, _ = get_baseline_datasets(val_dirs, coarse_targets,
+                targets_only=True)
+        _, y_test, _ = get_baseline_datasets(test_dirs, coarse_targets,
+                targets_only=True)
+    else:
+        raise ValueError("Parameter 'model_task' must be one of " +
+                "'classification' or 'regression'")
 
     # No validation set is needed
     y_train = np.hstack((y_train, y_val))
@@ -58,23 +86,30 @@ def main(args):
     mean = round(np.mean(y_train))
     median = round(np.median(y_train))
 
-    v_print(f'- Predict mean')
+    print(f'=> Predict mean')
     test_act = np.full(y_test.shape, mean)
 
     # Evaluate the model on the test set
-    test_scores_mean = evaluate_classification_model(y_test, test_act)
+    if model_task == 'classification':
+        test_scores_mean = evaluate_classification_model(y_test, test_act)
+    else:
+        test_scores_mean = evaluate_regression_model(y_test, test_act)
 
-    v_print(f'- Predict median')
+    print(f'=> Predict median')
     test_act = np.full(y_test.shape, median)
 
     # Evaluate the model on the test set
-    test_scores_median = evaluate_classification_model(y_test, test_act)
+    if model_task == 'classification':
+        test_scores_median = evaluate_classification_model(y_test, test_act)
+    else:
+        test_scores_median = evaluate_regression_model(y_test, test_act)
 
-    if save_model:
-        f_name = os.path.join(args.models_path, f'results.txt')
+    if model_name:
+        print('=> Saving the model')
+        f_name = os.path.join(args.models_path, f'results_{model_name}.txt')
 
         with open(f_name, "w") as f:
-            f.write(f'Naive baselines:\n')
+            f.write(f'Naive baseline:\n')
             f.write(f'- Predict mean:\n')
             for k, v in test_scores_mean.items():
                 f.write(f'\t\t{k}: {v}\n')

@@ -1,11 +1,11 @@
 #!/usr/bin/python3
 
-"""mimic_readers.py - Contains class for reading data from MIMIC-III CSVs. """
+"""readers.py - Contains classes for reading data"""
 
 __author__ = "Bas Straathof"
 
 import pandas as pd
-import os
+import json, os, random
 
 
 class MimicNICUReaders(object):
@@ -167,4 +167,100 @@ class MimicNICUReaders(object):
         df = df[df.HADM_ID.isin(df.HADM_ID)]
 
         return df
+
+
+class TimeSeriesReader(object):
+    """Reader to read length-of-stay timeseries sequences from a list file
+
+    Attributes:
+        list_file (str): Path to the .txt file containing a list of (filename,
+                         sequence length) combinations
+        config (str): Path to the nicu_los config file
+        ts_file (str): Name of the files containing the timeseries
+        coarse_targets (bool): Whether to use coarse targets
+        mask (bool): Whether to use missingness indicator variables
+    """
+    def __init__(self, list_file, config='nicu_los/config.json',
+            ts_file='timeseries_normalized.csv', coarse_targets=False,
+            mask=True):
+        self.current_index = 0
+        self.ts_file = ts_file
+        self.coarse_targets = coarse_targets
+
+        with open(list_file, 'r') as f:
+            self.data = f.readlines()
+
+        self.data = [line.split(',') for line in self.data]
+        self.data = [(subject_dir, int(row)) for (subject_dir, row) in \
+                self.data]
+
+        with open(config) as f:
+            config = json.load(f)
+            self.variables = config['variables']
+            if mask:
+                self.variables = self.variables + \
+                        ['mask_' + v for v in self.variables]
+
+    def random_shuffle(self, seed=None):
+        if seed: random.seed(seed)
+        random.shuffle(self.data)
+
+    def get_number_of_sequences(self):
+        return len(self.data)
+
+    def read_sequence(self, index):
+        """Read a timeseries sequence
+
+        Args:
+            index (int): Index of the reader (i.e. index of the list file)
+
+        Returns:
+            (dict): Dictionary containing the training features, the target
+                    y (i.e. remaining length-of-stay in # of hours) and the
+                    target t (i.e. the bucket corresponding to y)
+        """
+        if index < 0 or index >= len(self.data):
+            raise ValueError('Invalid index.')
+
+        sd, row = self.data[index][0], self.data[index][1]
+
+        ts = pd.read_csv(os.path.join(sd, self.ts_file))[:row]
+
+        X = ts[self.variables].to_numpy()
+        y = ts.LOS_HOURS.iloc[-1]
+
+        if self.coarse_targets:
+            t = ts.TARGET_COARSE.iloc[-1]
+        else:
+            t = ts.TARGET_FINE.iloc[-1]
+
+        return {'X': X, 'y': y, 't': t}
+
+    def read_chunk(self, chunk_size):
+        """Read a specific number of timeseries sequences
+
+        Args:
+            chunk_size (int): Size of the chunk
+
+        Returns:
+            data (dict): Dictionary containing a list of training features,
+                         a list of the targets y and a list of the target t
+        """
+        data = {}
+        for i in range(chunk_size):
+            for k, v in self.read_next().items():
+                if k not in data:
+                    data[k] = []
+                data[k].append(v)
+
+        return data
+
+    def read_next(self):
+        self.current_index += 1
+
+        if self.current_index == self.get_number_of_sequences():
+            self.current_index = 0
+
+        return self.read_sequence(self.current_index)
+
 

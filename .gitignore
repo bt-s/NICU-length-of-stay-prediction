@@ -145,3 +145,4 @@ conda-env/
 *.swm
 *.swl
 /cnn-test
+mycert.pem

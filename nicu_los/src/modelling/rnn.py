@@ -21,9 +21,11 @@ import tensorflow as tf
 from tensorflow.keras.callbacks import CSVLogger, EarlyStopping, \
         ModelCheckpoint, TensorBoard
 
-from nicu_los.src.utils.modelling_utils import construct_and_compile_model, \
-        create_list_file, data_generator, evaluate_classification_model, \
-        MetricsCallback, TimeSeriesReader
+from nicu_los.src.utils.modelling import construct_and_compile_model, \
+        create_list_file, data_generator, MetricsCallback
+from nicu_los.src.utils.evaluation import evaluate_classification_model
+        
+from nicu_los.src.utils.readers import TimeSeriesReader
 
 
 def parse_cl_args():
@@ -73,6 +75,9 @@ def parse_cl_args():
     parser.add_argument('--training', dest='training', action='store_true')
     parser.add_argument('--testing', dest='training', action='store_false')
 
+    parser.add_argument('--metrics-callback', dest='metrics_callback', action='store_true')
+    parser.add_argument('--no-metrics-callback', dest='metrics_callback', action='store_false')
+
     parser.add_argument('--coarse-targets', dest='coarse_targets',
             action='store_true')
     parser.add_argument('--no-coarse-targets', dest='coarse_targets',
@@ -84,7 +89,7 @@ def parse_cl_args():
             action='store_false')
 
     parser.set_defaults(enable_gpu=False, training=True, coarse_targets=True,
-            mask_indicator=True)
+            mask_indicator=True, metrics_callback=False)
 
     return parser.parse_args(argv[1:])
 
@@ -92,7 +97,12 @@ def parse_cl_args():
 def main(args):
     if args.enable_gpu:
         print('=> Using GPU(s)')
+        physical_devices = tf.config.experimental.list_physical_devices('GPU')
+        assert len(physical_devices) > 0, "Not enough GPU hardware devices available"
+        for i, _ in enumerate(physical_devices):
+            config = tf.config.experimental.set_memory_growth(physical_devices[i], True)
         strategy = tf.distribute.MirroredStrategy()
+
     else:
         print('=> Using CPU(s)')
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
@@ -151,8 +161,14 @@ def main(args):
         if mask:
             variables = variables + ['mask_' + v for v in variables]
 
+    if coarse_targets:
+        output_dimension = 3
+    else:
+        output_dimension = 10
+
     model_params = {
         'input_dimension': len(variables),
+        'output_dimension': output_dimension,
         'hidden_dimension': args.hidden_dimension,
         'dropout': args.dropout,
         'n_cells': args.n_cells}
@@ -201,10 +217,12 @@ def main(args):
                 log_dir=log_dir_tb, histogram_freq=1)
         logger_callback = CSVLogger(os.path.join(model_path, 'logs', model_name,
             'logs.csv'))
-        metrics_callback = MetricsCallback(model, train_data,
-                val_data, training_steps, validation_steps)
-        callbacks = [checkpoint_callback, logger_callback, metrics_callback,
-                tensorboard_callback]
+        callbacks = [checkpoint_callback, logger_callback, tensorboard_callback]
+
+        if args.metrics_callback:
+            metrics_callback = MetricsCallback(model, train_data,
+                    val_data, training_steps, validation_steps)
+            callbacks.append(metrics_callback)
 
         if early_stopping:
             early_stopping_callback = EarlyStopping(monitor='val_loss',
@@ -224,7 +242,7 @@ def main(args):
     else:
         test_list_file = os.path.join(data_path, 'test_list.txt')
         batch_size = 8 
-        steps = 2000
+        steps = 1000
         shuffle = False
 
         if not os.path.exists(test_list_file):
@@ -247,7 +265,7 @@ def main(args):
         n_sequences = test_reader.get_number_of_sequences()
         
         for batch, (x, y) in enumerate(tqdm(test_data, total=n_sequences/batch_size)):
-            if batch > n_sequences/batch_size:
+            if batch == 1000:#> n_sequences/batch_size:
                 break
 
             y_pred.append(np.argmax(model.predict_on_batch(x), axis=1))
