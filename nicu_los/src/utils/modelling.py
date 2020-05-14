@@ -16,8 +16,9 @@ from tqdm import tqdm
 
 from tensorflow.keras.callbacks import Callback
 from tensorflow.keras.models import Model
-from tensorflow.keras.layers import Bidirectional, Dense, Dropout, GRU, Input, \
-        LSTM, Masking
+from tensorflow.keras.layers import Activation, BatchNormalization, \
+        Bidirectional, concatenate, Conv1D, Dense, Dropout, \
+        GlobalAveragePooling1D, GRU, Input, LSTM, Masking, multiply, Reshape
 from tensorflow.keras.losses import SparseCategoricalCrossentropy
 from tensorflow.keras.optimizers import Adam
 
@@ -274,7 +275,45 @@ def construct_rnn(input_dimension, output_dimension, model_type='lstm',
     y = Dense(units=output_dimension, activation='softmax')(X)
     outputs = [y]
 
-    return Model(inputs=inputs, outputs=outputs, name=model_name)
+    model = Model(inputs=inputs, outputs=outputs, name=model_name)
+
+    return model
+
+
+def construct_lstm_fcn(input_dimension, output_dimension, dropout=0.8,
+        hid_dimension_lstm=8, squeeze_and_excite_block=True, model_name=""):
+
+    inputs = Input(shape=(None, input_dimension))
+
+    X1 = Masking()(inputs)
+    X1 = LSTM(hid_dimension_lstm)(X1)
+    X1 = Dropout(dropout)(X1)
+
+    X2 = Conv1D(128, 8, padding='same', kernel_initializer='he_uniform')(inputs)
+    X2 = BatchNormalization()(X2)
+    X2 = Activation('relu')(X2)
+    if squeeze_and_excite_block:
+        X2 = squeeze_excite_block(X2)
+
+    X2 = Conv1D(256, 5, padding='same', kernel_initializer='he_uniform')(X2)
+    X2 = BatchNormalization()(X2)
+    X2 = Activation('relu')(X2)
+    if squeeze_and_excite_block:
+        X2 = squeeze_excite_block(X2)
+
+    X2 = Conv1D(128, 3, padding='same', kernel_initializer='he_uniform')(X2)
+    X2 = BatchNormalization()(X2)
+    X2 = Activation('relu')(X2)
+
+    X2 = GlobalAveragePooling1D()(X2)
+
+    X = concatenate([X1, X2])
+
+    outputs = Dense(output_dimension, activation='softmax')(x)
+
+    model = Model(inputs=inputs, outputs=outputs, name=model_name)
+
+    return model
 
 
 def construct_and_compile_model(model_type, model_name, checkpoint_file,
@@ -297,8 +336,14 @@ def construct_and_compile_model(model_type, model_name, checkpoint_file,
     dropout = model_params['dropout']
     hid_dimension = model_params['hidden_dimension']
 
-    model = construct_rnn(input_dimension, output_dimension, model_type,
-            n_cells, dropout, hid_dimension, model_name)
+    if model_type == 'lstm' or model_type == 'gru':
+        model = construct_rnn(input_dimension, output_dimension, model_type,
+                n_cells, dropout, hid_dimension, model_name)
+    elif model_type == 'lstm_fcn':
+        model = construct_lstm_fcn(input_dimension, output_dimension, dropout,
+                hid_dimension, False, model_name)
+    else:
+        raise ValueError(f'Model type {model_type} is not supported.')
 
     if checkpoint_file:
         model.load_weights(os.path.join(checkpoints_dir, checkpoint_file))
@@ -309,6 +354,20 @@ def construct_and_compile_model(model_type, model_name, checkpoint_file,
             metrics=['accuracy'])
 
     return model
+
+
+def squeeze_excite_block(X):
+    filters = X.shape[-1]
+
+    se = GlobalAveragePooling1D()(X)
+    se = Reshape((1, filters))(se)
+    se = Dense(filters // 16,  activation='relu',
+            kernel_initializer='he_normal', use_bias=False)(se)
+    se = Dense(filters, activation='sigmoid', kernel_initializer='he_normal',
+            use_bias=False)(se)
+    se = multiply([X, se])
+
+    return se
 
 
 class MetricsCallback(Callback):
