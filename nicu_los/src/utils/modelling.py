@@ -309,7 +309,7 @@ def construct_lstm_fcn(input_dimension, output_dimension, dropout=0.8,
 
     X = concatenate([X1, X2])
 
-    outputs = Dense(output_dimension, activation='softmax')(x)
+    outputs = Dense(output_dimension, activation='softmax')(X)
 
     model = Model(inputs=inputs, outputs=outputs, name=model_name)
 
