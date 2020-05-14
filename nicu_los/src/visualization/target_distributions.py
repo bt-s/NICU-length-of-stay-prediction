@@ -17,7 +17,7 @@ from sys import argv
 from tqdm import tqdm
 
 from nicu_los.src.utils.utils import get_subject_dirs
-from nicu_los.src.utils.visualization_utils import create_histogram
+from nicu_los.src.utils.visualization import create_histogram
 
 
 def parse_cl_args():

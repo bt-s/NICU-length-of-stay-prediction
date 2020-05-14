@@ -16,7 +16,7 @@ import numpy as np
 from sys import argv
 from datetime import datetime
 
-from nicu_los.src.utils.modelling_utils import evaluate_classification_model, \
+from nicu_los.src.utils.modelling import evaluate_classification_model, \
         get_train_val_test_baseline_sets
 
 

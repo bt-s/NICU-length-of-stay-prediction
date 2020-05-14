@@ -17,7 +17,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler
 
-from nicu_los.src.utils.modelling_utils import evaluate_regression_model, \
+from nicu_los.src.utils.modelling import evaluate_regression_model, \
         get_baseline_datasets
 
 
