@@ -27,13 +27,12 @@ def parse_cl_args():
     """Parses CL arguments"""
     parser = argparse.ArgumentParser()
     parser.add_argument('-sp', '--subjects-path', type=str,
-            default='data',
-            help='Path to the subjects directories.')
+            default='data', help='Path to the subjects directories.')
     parser.add_argument('-mp', '--models-path', type=str,
             default='models/logistic_regression/',
             help='Path to the models directory.')
     parser.add_argument('-mn', '--model-name', type=str, default="",
-            help='Name of the  model.')
+            help='Name of the model.')
 
     parser.add_argument('--grid-search', dest='grid_search',
             action='store_true')

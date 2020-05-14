@@ -30,16 +30,17 @@ from nicu_los.src.utils.utils import get_subject_dirs
 
 
 def get_baseline_datasets(subject_dirs, coarse_targets=False,
-        pre_imputed=False):
+        pre_imputed=False, targets_only=False):
     """Obtain baseline data sets
 
     Args:
         subject_dirs (list): List of subject directories
         coarse_targets (bool): Whether to use coarse targets
         pre_imputed (bool): Whether to use features from pre-imputed data 
+        targets_only (bool): Whether to only load the targets 
 
     Returns:
-        X (np.ndarray): Features
+        X (np.ndarray|None): Features
         y (np.array): Targets -- remaining LOS
         t (np.array): Target -- buckets
     """
@@ -57,7 +58,11 @@ def get_baseline_datasets(subject_dirs, coarse_targets=False,
         # Add the masks
         variables = ['mask_' + v for v in variables]
 
-    X = np.zeros((tot_num_sub_seqs, len(variables)*len(sub_seqs)*len(stat_fns)))
+    if not targets_only:
+        X = np.zeros((tot_num_sub_seqs, len(variables)*len(sub_seqs)*len(stat_fns)))
+    else:
+        X = None
+
     y, t = np.zeros(tot_num_sub_seqs), np.zeros(tot_num_sub_seqs)
 
     if coarse_targets:
@@ -72,65 +77,21 @@ def get_baseline_datasets(subject_dirs, coarse_targets=False,
     cnt = 0
     for i, sd in enumerate(tqdm(subject_dirs)):
         cnt_old = cnt
-        x = np.load(os.path.join(sd, f'X_baseline{pi_str}.npy'))
+        if not targets_only:
+            x = np.load(os.path.join(sd, f'X_baseline{pi_str}.npy'))
+
         yy = np.load(os.path.join(sd, f'y_baseline{pi_str}.npy'))
         tt = np.load(os.path.join(sd, f't_baseline_{target_str}{pi_str}.npy'))
 
         cnt += len(yy)
 
-        X[cnt_old:cnt, :] = x
+        if not targets_only:
+            X[cnt_old:cnt, :] = x
+
         y[cnt_old:cnt] = yy
         t[cnt_old:cnt] = tt
 
     return X, y, t
-
-
-def get_train_val_test_baseline_sets(data_path, task):
-    """Get the training, validation and test baseline data sets
-
-    Args:
-        data_path (str): Path to the data directory
-        task (str): One of 'regression' and 'classification'
-
-    Returns:
-        X_train (np.ndarray): Training features
-        X_val (np.ndarray): Validation features
-        X_test (np.ndarray): Test features
-
-        EITHER (if task == 'regression'):
-            y_train (np.ndarray): Training targets -- remaining LOS
-            y_val (np.ndarray): Validation targets -- remaining LOS
-            y_test (np.ndarray): Test targets -- remaining LOS
-
-        OR (if task == 'classification'):
-            t_train (np.ndarray): Training targets -- buckets
-            t_val (np.ndarray): Validation targets -- buckets
-            t_test (np.ndarray): Test targets -- buckets
-    """
-    with open(os.path.join(data_path, 'training_subjects.txt'), 'r') as f:
-        train_dirs = f.read().splitlines()
-    with open(os.path.join(data_path, 'validation_subjects.txt') , 'r') as f:
-        val_dirs = f.read().splitlines()
-    with open(os.path.join(data_path, 'test_subjects.txt'), 'r') as f:
-        test_dirs = f.read().splitlines()
-
-    X_train = np.load(os.path.join(data_path,'X_train.npy'))
-    y_train = np.load(os.path.join(data_path, 'y_train.npy'))
-    t_train = np.load(os.path.join(data_path, 't_train.npy'))
-    X_val = np.load(os.path.join(data_path,'X_val.npy'))
-    y_val = np.load(os.path.join(data_path, 'y_val.npy'))
-    t_val = np.load(os.path.join(data_path, 't_val.npy'))
-    X_test = np.load(os.path.join(data_path,'X_test.npy'))
-    y_test = np.load(os.path.join(data_path, 'y_test.npy'))
-    t_test = np.load(os.path.join(data_path, 't_test.npy'))
-
-    if task == 'classification':
-        return X_train, t_train, X_val, t_val, X_test, t_test
-    elif task == 'regression':
-        return X_train, y_train, X_val, y_val, X_test, y_test
-    else:
-        raise ValueError("Task must be one of: 'classification', \
-                'regression'.")
 
 
 class TimeSeriesReader(object):
