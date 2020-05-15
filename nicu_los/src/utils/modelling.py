@@ -360,14 +360,17 @@ def construct_and_compile_model(model_type, model_name, checkpoint_file,
     input_dimension = model_params['input_dimension']
     output_dimension = model_params['output_dimension']
     dropout = model_params['dropout']
+    global_dropout = model_params['global_dropout']
     hid_dimension = model_params['hidden_dimension']
+    multiplier = model_params['multiplier']
 
     if model_type == 'lstm' or model_type == 'gru':
         model = construct_rnn(input_dimension, output_dimension, model_type,
                 n_cells, dropout, hid_dimension, model_name)
     elif model_type == 'lstm_cw' or model_type == 'gru_cw':
         model = construct_channel_wise_rnn(input_dimension, output_dimension,
-                model_type, n_cells, dropout, hid_dimension, model_name)
+                model_type, dropout, global_dropout, hid_dimension, multiplier,
+                model_name)
     elif model_type == 'lstm_fcn':
         model = construct_lstm_fcn(input_dimension, output_dimension, dropout,
                 hid_dimension, False, model_name)
@@ -436,20 +439,21 @@ class MetricsCallback(Callback):
 
 
 def construct_channel_wise_rnn(input_dimension, output_dimension,
-        model_type='lstm_cw', n_cells=1, dropout=0.0, hid_dimension=16,
-        size_coef=8, model_name=""):
+        model_type='lstm_cw', dropout=0.0, global_dropout=0.0,
+        hid_dimension=16, multiplier=4, model_name=""):
     """Construct an RNN model (either LSTM or GRU)
 
     Args:
         input_dimension (int): Input dimension of the model
         output_dimension (int): Output dimension of the model
-        n_cells (int): Number of RNN cells
         dropout (float): Amount of dropout to apply
+        global_dropout (float): Amount of dropout to apply to the global dropout layer
         hid_dimension (int): Dimension of the hidden layer (i.e. # of unit in
                              the RNN cell)
+        multiplier (int): Multiplier for the hidden dimension of the global LSTM 
 
     Returns:
-        model (tf.keras.Model): Constructed RNN model
+        model (tf.keras.Model): Constructed channel-wise RNN model
     """
     X = Input(shape=(None, input_dimension))
     inputs = [X]
@@ -463,48 +467,30 @@ def construct_channel_wise_rnn(input_dimension, output_dimension,
         mask = int(feature+input_dimension/2)
         channel_slice = Slice(feature, mask)(X)
 
-        for layer in range(n_cells):
-            num_hid_units = hid_dimension // 2
+        num_hid_units = hid_dimension // 2
 
-            cell = LSTM(units=num_hid_units, activation='tanh',
-                    return_sequences=True, recurrent_dropout=dropout,
-                    dropout=dropout)
+        cell = LSTM(units=num_hid_units, activation='tanh',
+                return_sequences=True, recurrent_dropout=dropout,
+                dropout=dropout)
 
-            cXs.append(Bidirectional(cell)(channel_slice))
+        cXs.append(Bidirectional(cell)(channel_slice))
 
     # Concatenate the channels
     X = concatenate(cXs, axis=2)
 
-    for layer in range(n_cells - 1):
-        num_hid_units = int(size_coef*hid_dimension) // 2
-
-        if model_type == 'lstm_cw':
-            cell = LSTM(units=num_hid_units, activation='tanh',
-                    return_sequences=True, recurrent_dropout=dropout,
-                    dropout=dropout)
-        elif model_type == 'gru_cw':
-            cell = GRU(units=num_hid_units, activation='tanh',
-                    return_sequences=True, recurrent_dropout=dropout,
-                    dropout=dropout)
-        else:
-            raise ValueError("Parameter 'model_type' should be one of " +
-                    "'lstm_cw' or 'gru_cw'.")
-
-        X = Bidirectional(cell)(Z)
-
     # There always has to be at least one cell
     if model_type == 'lstm_cw':
-        X = LSTM(activation='tanh', dropout=dropout, recurrent_dropout=dropout,
-                return_sequences=False, units=hid_dimension)(X)
+        X = LSTM(activation='tanh', dropout=dropout, recurrent_dropout=0.2,
+                return_sequences=False, units=multiplier*hid_dimension)(X)
     elif model_type == 'gru_cw':
-        X = GRU(activation='tanh', dropout=dropout, recurrent_dropout=dropout,
-                return_sequences=False, units=hid_dimension)(X)
+        X = GRU(activation='tanh', dropout=dropout, recurrent_dropout=0.2,
+                return_sequences=False, units=multiplier*hid_dimension)(X)
     else:
         raise ValueError("Parameter 'model_type' should be one of " +
                 "'lstm_cw' or 'gru_cw'.")
 
-    if dropout:
-        X = Dropout(dropout)(X)
+    if global_dropout:
+        X = Dropout(global_dropout)(X)
 
     y = Dense(units=output_dimension, activation='softmax')(X)
     outputs = [y]

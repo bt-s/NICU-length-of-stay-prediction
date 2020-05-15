@@ -62,10 +62,17 @@ def parse_cl_args():
 
     parser.add_argument('--dropout', type=float, default=0.0,
             help='The amount of dropout to be used.')
+    parser.add_argument('--global-dropout', type=float, default=0.0,
+            help='The amount of dropout to be used in the global dropout " \
+                    "layer of a multi-channel RNN.')
     parser.add_argument('--hidden-dimension', type=int, default=64,
             help='The hidden dimension per layer of the RNN.')
+    parser.add_argument('--multiplier', type=int, default=4,
+            help='Multiplier of the hidden dimension of the global cell in '\
+                    'channel-wise RNN.')
     parser.add_argument('--n-cells', type=int, default=1,
-            help='The number of cells in the RNN.')
+            help='The number of cells in the RNN " \
+                    " (does not apply to channel-wise RNN).')
 
     parser.add_argument('--mask-indicatior', dest='mask_indicator',
             action='store_true')
@@ -75,8 +82,10 @@ def parse_cl_args():
     parser.add_argument('--training', dest='training', action='store_true')
     parser.add_argument('--testing', dest='training', action='store_false')
 
-    parser.add_argument('--metrics-callback', dest='metrics_callback', action='store_true')
-    parser.add_argument('--no-metrics-callback', dest='metrics_callback', action='store_false')
+    parser.add_argument('--metrics-callback', dest='metrics_callback',
+            action='store_true')
+    parser.add_argument('--no-metrics-callback', dest='metrics_callback',
+            action='store_false')
 
     parser.add_argument('--coarse-targets', dest='coarse_targets',
             action='store_true')
@@ -171,6 +180,8 @@ def main(args):
         'output_dimension': output_dimension,
         'hidden_dimension': args.hidden_dimension,
         'dropout': args.dropout,
+        'global_dropout': args.global_dropout,
+        'multiplier': args.multiplier,
         'n_cells': args.n_cells}
 
     if args.enable_gpu:
