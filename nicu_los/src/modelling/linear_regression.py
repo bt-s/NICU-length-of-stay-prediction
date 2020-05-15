@@ -59,7 +59,6 @@ def main(args):
     with open(f'{data_path}/test_subjects.txt', 'r') as f:
         test_dirs = f.read().splitlines()
 
-    # Get the data
     X_train, y_train, _ = get_baseline_datasets(train_dirs,
             pre_imputed=pre_imputed)
     X_val, y_val, _ = get_baseline_datasets(val_dirs, pre_imputed=pre_imputed)
@@ -74,7 +73,6 @@ def main(args):
         X_val = imputer.transform(X_val)
         X_test = imputer.transform(X_test)
 
-    # Normalize
     print('=> Normalizing the data')
     scaler = StandardScaler()
     X_train = scaler.fit_transform(X_train)
@@ -94,7 +92,7 @@ def main(args):
     # Predict on the training set
     train_preds = clf.predict(X_train)
     train_preds = np.maximum(train_preds, np.min(y_train))
-    # Evaluate the model on the training set
+
     print('=> Evaluate fitted model on the training set')
     train_scores = evaluate_regression_model(y_train, train_preds)
 
@@ -102,12 +100,10 @@ def main(args):
     test_preds = clf.predict(X_test)
     test_preds = np.maximum(test_preds, np.min(y_train))
 
-    # Evaluate the model on the test set
     print('=> Evaluate fitted model on the test set')
     test_scores = evaluate_regression_model(y_test, test_preds)
 
     print('=> Saving the model')
-    # Save the results
     f_name = os.path.join(args.models_path, f'results_{model_name}.txt')
 
     with open(f_name, "a") as f:
@@ -120,8 +116,7 @@ def main(args):
             f.write(f'\t\t{k}: {v}\n')
 
     # Save the model
-    f_name = os.path.join(args.models_path,
-            f'model_{model_name}.pkl')
+    f_name = os.path.join(args.models_path, f'model_{model_name}.pkl')
 
     with open(f_name, 'wb') as f:
         pickle.dump(clf, f)
