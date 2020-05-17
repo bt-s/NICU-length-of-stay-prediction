@@ -24,6 +24,8 @@ from tensorflow.keras.layers import Activation, BatchNormalization, \
 from tensorflow.keras.losses import MeanAbsoluteError, SparseCategoricalCrossentropy
 from tensorflow.keras.optimizers import Adam
 
+from sklearn.utils import shuffle
+
 from nicu_los.src.utils.utils import get_subject_dirs
 from nicu_los.src.utils.readers import TimeSeriesReader
 from nicu_los.src.utils.evaluation import evaluate_classification_model, \
@@ -124,8 +126,8 @@ def data_generator(list_file, steps, batch_size, task, coarse_targets=False,
                     yield X, t
 
 
-def get_baseline_datasets(subject_dirs, coarse_targets=False,
-        pre_imputed=False, targets_only=False):
+def get_baseline_datasets(subject_dirs, coarse_targets=False, pre_imputed=False,
+        targets_only=False):
     """Obtain baseline data sets
 
     Args:
@@ -186,6 +188,8 @@ def get_baseline_datasets(subject_dirs, coarse_targets=False,
 
         y[cnt_old:cnt] = yy
         t[cnt_old:cnt] = tt
+
+    X, y, t = shuffle(X, y, t)
 
     return X, y, t
 
