@@ -213,16 +213,24 @@ def main(args):
                 val_dirs = f.read().splitlines()
                 create_list_file(val_dirs, val_list_file)
 
-        train_data = tf.data.Dataset.from_generator(data_generator,
-                args=[train_list_file, training_steps, batch_size, task,
-                    coarse_targets, mask],
+        # Instantiate the training and validation readers
+        train_reader = TimeSeriesReader(train_list_file,
+                coarse_targets=coarse_targets, mask=mask, name="Train reader")
+        val_reader = TimeSeriesReader(val_list_file,
+                coarse_targets=coarse_targets, mask=mask,
+                name="Validation reader")
+
+        train_data_generator = data_generator(train_reader, training_steps,
+                batch_size, task)
+        val_data_generator = data_generator(val_reader, validation_steps,
+                batch_size, task)
+
+        train_data = tf.data.Dataset.from_generator(lambda: train_data_generator,
                 output_types=(tf.float32, tf.int16),
                 output_shapes=((batch_size, None, len(variables)),
                     (batch_size,)))
 
-        val_data = tf.data.Dataset.from_generator(data_generator,
-                args=[val_list_file, validation_steps, batch_size, task,
-                    coarse_targets, mask],
+        val_data = tf.data.Dataset.from_generator(lambda: val_data_generator,
                 output_types=(tf.float32, tf.int16),
                 output_shapes=((batch_size, None, len(variables)),
                     (batch_size,)))

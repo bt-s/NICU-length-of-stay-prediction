@@ -73,18 +73,14 @@ def create_list_file(subject_dirs, list_file_path,
                 f.write(f'{sd}, {row}\n')
 
 
-def data_generator(list_file, steps, batch_size, task, coarse_targets=False,
-        mask=True, shuffle=True):
+def data_generator(reader, steps, batch_size, task, shuffle=True):
     """Data loader function
 
     Args:
-        list_file (str): Path to a file that contains a list of paths to
-                         timeseries
+        reader (TimeSeriesReader): Time series reader object
         steps (int): Number of steps per epoch
         batch_size (int): Training batch size
         taks (str): One of 'classification'  and 'regression'
-        coarse_targets (bool): Whether to use coarse targets
-        mask (bool): Whether to mask the variables
         shuffle (bool): Whether to shuffle the data
 
     Yields:
@@ -95,35 +91,29 @@ def data_generator(list_file, steps, batch_size, task, coarse_targets=False,
         OR (if task == 'classification'):
             t ():
     """
-    task = task.decode("utf-8")
-    reader = TimeSeriesReader(list_file, coarse_targets=coarse_targets,
-            mask=mask)
-
     chunk_size = steps*batch_size
 
     while True:
-        if shuffle and reader.current_index == 0:
-            reader.random_shuffle(seed=42)
+        # Only shuffle when the current reader index is 0, or if we are close
+        # to the end of the reader -- then we reset the index
+        if shuffle and (reader.current_index == 0 or reader.current_index >
+                (reader.get_number_of_sequences() - chunk_size)):
+            reader.random_shuffle()
+            reader.current_index = 0 
 
-        remaining = chunk_size
+        data = reader.read_chunk(chunk_size)
 
-        while remaining > 0:
-            current_size = min(chunk_size, remaining)
-            remaining -= current_size
+        (Xs, ys, ts) = sort_and_batch_shuffle(data, batch_size)
 
-            data = reader.read_chunk(current_size)
+        for i in range(0, chunk_size, batch_size):
+            X = zero_pad_timeseries(Xs[i:i + batch_size])
+            y = ys[i:i+batch_size]
+            t = ts[i:i+batch_size]
 
-            (Xs, ys, ts) = sort_and_batch_shuffle(data, batch_size)
-
-            for i in range(0, current_size, batch_size):
-                X = zero_pad_timeseries(Xs[i:i + batch_size])
-                y = ys[i:i+batch_size]
-                t = ts[i:i+batch_size]
-
-                if task == 'regression':
-                    yield X, y
-                else:
-                    yield X, t
+            if task == 'regression':
+                yield X, y
+            else:
+                yield X, t
 
 
 def get_baseline_datasets(subject_dirs, coarse_targets=False, pre_imputed=False,
@@ -410,7 +400,7 @@ def construct_and_compile_model(model_type, model_name, task, checkpoint_file,
     if checkpoint_file:
         model.load_weights(os.path.join(checkpoints_dir, checkpoint_file))
 
-    model.compile(optimizer=Adam(learning_rate = 0.1), loss=loss_fn, metrics=metrics)
+    model.compile(optimizer=Adam(), loss=loss_fn, metrics=metrics)
 
     model.summary()
 
