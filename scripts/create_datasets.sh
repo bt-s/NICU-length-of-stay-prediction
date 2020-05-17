@@ -16,7 +16,7 @@ python -m nicu_los.src.preprocessing.obtain_normalization_statistics \
   > logs/output_obtain_normalization_statistics
 python -m nicu_los.src.preprocessing.normalize_values \
   > logs/output_normalize_values
-python -m nicu_los.src.preprocessing.create_baseline_datasets -pi 0 \
-  > logs/output_create_baseline_datasets
-python -m nicu_los.src.preprocessing.create_baseline_datasets -pi 1 \
-  > logs/output_create_baseline_datasets
+python -m nicu_los.src.preprocessing.create_baseline_datasets \
+	--not-pre-imputed > logs/output_create_baseline_datasets
+python -m nicu_los.src.preprocessing.create_baseline_datasets \
+       	--pre-imputed > logs/output_create_baseline_datasets
