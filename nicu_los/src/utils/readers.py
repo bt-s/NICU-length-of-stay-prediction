@@ -182,10 +182,11 @@ class TimeSeriesReader(object):
     """
     def __init__(self, list_file, config='nicu_los/config.json',
             ts_file='timeseries_normalized.csv', coarse_targets=False,
-            mask=True):
+            mask=True, name=""):
         self.current_index = 0
         self.ts_file = ts_file
         self.coarse_targets = coarse_targets
+        self.name = name
 
         with open(list_file, 'r') as f:
             self.data = f.readlines()
