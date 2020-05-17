@@ -49,7 +49,8 @@ def parse_cl_args():
     parser.add_argument('--not-pre-imputed', dest='pre_imputed',
             action='store_false')
 
-    parser.set_defaults(pre_imputed=False, grid_search=True, coarse_targets=True)
+    parser.set_defaults(pre_imputed=False, grid_search=True,
+            coarse_targets=True)
 
     return parser.parse_args(argv[1:])
 
@@ -76,7 +77,6 @@ def main(args):
     with open(f'{data_path}/test_subjects.txt', 'r') as f:
         test_dirs = f.read().splitlines()
 
-    # Get the data
     X_train, _, y_train = get_baseline_datasets(train_dirs, coarse_targets,
             pre_imputed)
     X_val, _, y_val = get_baseline_datasets(val_dirs, coarse_targets,
@@ -92,7 +92,6 @@ def main(args):
         X_val = imputer.transform(X_val)
         X_test = imputer.transform(X_test)
 
-    # Normalize
     print('=> Normalizing the data')
     scaler = StandardScaler()
     X_train = scaler.fit_transform(X_train)
@@ -145,11 +144,9 @@ def main(args):
     test_preds = clf.predict_proba(X_test)
     test_act = np.argmax(test_preds, axis=1)
 
-    # Evaluate the model on the training set
     print('=> Evaluate fitted model on the training set')
     train_scores = evaluate_classification_model(y, train_act)
 
-    # Evaluate the model on the test set
     print('=> Evaluate fitted model on the test set')
     test_scores = evaluate_classification_model(y_test, test_act)
 
@@ -174,3 +171,4 @@ def main(args):
 
 if __name__ == '__main__':
     main(parse_cl_args())
+
