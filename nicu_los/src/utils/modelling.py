@@ -21,12 +21,13 @@ from tensorflow.keras.layers import Activation, BatchNormalization, \
         Bidirectional, concatenate, Conv1D, Dense, Dropout, \
         GlobalAveragePooling1D, GRU, Input, Layer, LSTM, Masking, multiply, \
         Reshape
-from tensorflow.keras.losses import SparseCategoricalCrossentropy
+from tensorflow.keras.losses import MeanAbsoluteError, SparseCategoricalCrossentropy
 from tensorflow.keras.optimizers import Adam
 
 from nicu_los.src.utils.utils import get_subject_dirs
 from nicu_los.src.utils.readers import TimeSeriesReader
-from nicu_los.src.utils.evaluation import evaluate_classification_model
+from nicu_los.src.utils.evaluation import evaluate_classification_model, \
+        evaluate_regression_model
 
 
 class Slice(Layer):
@@ -68,8 +69,8 @@ def create_list_file(subject_dirs, list_file_path,
                 f.write(f'{sd}, {row}\n')
 
 
-def data_generator(list_file, steps, batch_size, task='classification',
-        coarse_targets=False, mask=True, shuffle=True):
+def data_generator(list_file, steps, batch_size, task, coarse_targets=False,
+        mask=True, shuffle=True):
     """Data loader function
 
     Args:
@@ -90,6 +91,7 @@ def data_generator(list_file, steps, batch_size, task='classification',
         OR (if task == 'classification'):
             t ():
     """
+    task = task.decode("utf-8")
     reader = TimeSeriesReader(list_file, coarse_targets=coarse_targets,
             mask=mask)
 
@@ -212,7 +214,8 @@ def sort_and_batch_shuffle(data, batch_size):
     data.sort(key=(lambda x: x[0].shape[0]))
 
     # Create batches of time series that are closest in length
-    batches = [data[i: i + batch_size] for i in range(0, len(data), batch_size)]
+    batches = [data[i: i + batch_size] for i in range(0, len(data),
+        batch_size)]
 
     # Shuffle the batches randomly
     random.shuffle(batches)
@@ -259,11 +262,10 @@ def construct_rnn(input_dimension, output_dimension, model_type='lstm',
     Returns:
         model (tf.keras.Model): Constructed RNN model
     """
-    X = Input(shape=(None, input_dimension))
-    inputs = [X]
+    inputs  = Input(shape=(None, input_dimension))
 
     # Skip timestep if all  values of the input tensor are 0
-    X = Masking()(X)
+    X = Masking()(inputs)
 
     num_hid_units = hid_dimension
 
@@ -298,8 +300,12 @@ def construct_rnn(input_dimension, output_dimension, model_type='lstm',
     if dropout:
         X = Dropout(dropout)(X)
 
-    y = Dense(units=output_dimension, activation='softmax')(X)
-    outputs = [y]
+    if output_dimension != 1:
+        # Classification
+        outputs = Dense(units=output_dimension, activation='softmax')(X)
+    else:
+        # Regression 
+        outputs = Dense(units=output_dimension)(X)
 
     model = Model(inputs=inputs, outputs=outputs, name=model_name)
 
@@ -335,19 +341,26 @@ def construct_lstm_fcn(input_dimension, output_dimension, dropout=0.8,
 
     X = concatenate([X1, X2])
 
-    outputs = Dense(output_dimension, activation='softmax')(X)
+    if output_dimension != 1:
+        # Classification
+        outputs = Dense(units=output_dimension, activation='softmax')(X)
+    else:
+        # Regression 
+        outputs = Dense(units=output_dimension)(X)
 
     model = Model(inputs=inputs, outputs=outputs, name=model_name)
 
     return model
 
 
-def construct_and_compile_model(model_type, model_name, checkpoint_file,
+def construct_and_compile_model(model_type, model_name, task, checkpoint_file,
         checkpoints_dir, model_params={}):
     """Construct and compile a model of a specific type
 
     Args:
         model_type (str): The type of model to be constructed
+        model_name (str): The name of model to be constructed
+        task (str): Either 'regression' or 'classification'
         checkpoint_file (str): Name of a checkpoint file
         checkpoints_dir (str): Path to the checkpoints directory
         model_params (dict): Possible hyper-parameters for the model to be
@@ -363,6 +376,17 @@ def construct_and_compile_model(model_type, model_name, checkpoint_file,
     global_dropout = model_params['global_dropout']
     hid_dimension = model_params['hidden_dimension']
     multiplier = model_params['multiplier']
+
+    if task == 'classification':
+        loss_fn = SparseCategoricalCrossentropy()
+        metrics = ['accuracy']
+    elif task == 'regression':
+        loss_fn = MeanAbsoluteError()
+        metrics = ['mse']
+        output_dimension = 1
+    else:
+        raise ValueError('Argument "task" must be one of "classification" ' \
+                'or "regression"')
 
     if model_type == 'lstm' or model_type == 'gru':
         model = construct_rnn(input_dimension, output_dimension, model_type,
@@ -380,10 +404,9 @@ def construct_and_compile_model(model_type, model_name, checkpoint_file,
     if checkpoint_file:
         model.load_weights(os.path.join(checkpoints_dir, checkpoint_file))
 
-    model.compile(
-            optimizer=Adam(),
-            loss=SparseCategoricalCrossentropy(),
-            metrics=['accuracy'])
+    model.compile(optimizer=Adam(learning_rate = 0.1), loss=loss_fn, metrics=metrics)
+
+    model.summary()
 
     return model
 
@@ -403,9 +426,10 @@ def squeeze_excite_block(X):
 
 
 class MetricsCallback(Callback):
-    def __init__(self, model, training_data, validation_data, training_steps,
-            validation_steps):
+    def __init__(self, model, task, training_data, validation_data,
+            training_steps, validation_steps):
         self.model = model
+        self.task = task
         self.training_data = training_data
         self.validation_data = validation_data
 
@@ -419,11 +443,23 @@ class MetricsCallback(Callback):
             if batch > self.training_steps:
                 break
 
-            y_pred.append(np.argmax(self.model.predict_on_batch(x), axis=1))
-            y_true.append(y.numpy())
+            if self.task == 'classification':
+                y_pred.append(np.argmax(self.model.predict_on_batch(x), axis=1))
+            else:
+                y_pred.append(self.model.predict_on_batch(x))
 
-        evaluate_classification_model(np.concatenate(y_true, axis=0),
-                np.concatenate(y_pred, axis=0))
+            y_true.append(y.numpy())
+        for i, _ in enumerate(y_pred):
+            print(y_pred[i])
+            print(y_true[i])
+            print()
+
+        if self.task == 'classification':
+            evaluate_classification_model(np.concatenate(y_true, axis=0),
+                    np.concatenate(y_pred, axis=0))
+        else:
+            evaluate_regression_model(np.concatenate(y_true, axis=0),
+                    np.concatenate(y_pred, axis=0))
 
         print('\n=> Predict on validation data:\n')
         y_true, y_pred = [], []
@@ -431,11 +467,23 @@ class MetricsCallback(Callback):
             if batch > self.validation_steps:
                 break
 
-            y_pred.append(np.argmax(self.model.predict_on_batch(x), axis=1))
-            y_true.append(y.numpy())
+            if self.task == 'classification':
+                y_pred.append(np.argmax(self.model.predict_on_batch(x), axis=1))
+            else:
+                y_pred.append(self.model.predict_on_batch(x))
 
-        evaluate_classification_model(np.concatenate(y_true, axis=0),
-                np.concatenate(y_pred, axis=0))
+            y_true.append(y.numpy())
+        for i, _ in enumerate(y_pred):
+            print(y_pred[i])
+            print(y_true[i])
+            print()
+
+        if self.task == 'classification':
+            evaluate_classification_model(np.concatenate(y_true, axis=0),
+                    np.concatenate(y_pred, axis=0))
+        else:
+            evaluate_regression_model(np.concatenate(y_true, axis=0),
+                    np.concatenate(y_pred, axis=0))
 
 
 def construct_channel_wise_rnn(input_dimension, output_dimension,
@@ -455,11 +503,10 @@ def construct_channel_wise_rnn(input_dimension, output_dimension,
     Returns:
         model (tf.keras.Model): Constructed channel-wise RNN model
     """
-    X = Input(shape=(None, input_dimension))
-    inputs = [X]
+    inputs = Input(shape=(None, input_dimension))
 
     # Skip timestep if all  values of the input tensor are 0
-    X = Masking()(X)
+    X = Masking()(inputs)
 
     # Train LSTMs over the channels, and append them
     cXs = []
@@ -492,8 +539,12 @@ def construct_channel_wise_rnn(input_dimension, output_dimension,
     if global_dropout:
         X = Dropout(global_dropout)(X)
 
-    y = Dense(units=output_dimension, activation='softmax')(X)
-    outputs = [y]
+    if output_dimension != 1:
+        # Classification
+        outputs = Dense(units=output_dimension, activation='softmax')(X)
+    else:
+        # Regression 
+        outputs = Dense(units=output_dimension)(X)
 
     model = Model(inputs=inputs, outputs=outputs, name=model_name)
 

@@ -23,7 +23,8 @@ from tensorflow.keras.callbacks import CSVLogger, EarlyStopping, \
 
 from nicu_los.src.utils.modelling import construct_and_compile_model, \
         create_list_file, data_generator, MetricsCallback
-from nicu_los.src.utils.evaluation import evaluate_classification_model
+from nicu_los.src.utils.evaluation import evaluate_classification_model, \
+        evaluate_regression_model
         
 from nicu_los.src.utils.readers import TimeSeriesReader
 
@@ -97,8 +98,11 @@ def parse_cl_args():
     parser.add_argument('--disable-gpu', dest='enable_gpu',
             action='store_false')
 
+    parser.add_argument('--regression', dest='task', action='store_const',
+            const='regression')
+
     parser.set_defaults(enable_gpu=False, training=True, coarse_targets=True,
-            mask_indicator=True, metrics_callback=False)
+            mask_indicator=True, metrics_callback=False, task='classification')
 
     return parser.parse_args(argv[1:])
 
@@ -119,6 +123,7 @@ def main(args):
     coarse_targets = args.coarse_targets
     model_name = args.model_name
     model_type = args.model_type
+    task = args.task
 
     early_stopping = args.early_stopping
     training = args.training
@@ -126,6 +131,7 @@ def main(args):
     if training:
         print(f'=> Training {model_name}') 
         print(f'=> Early stopping: {early_stopping}')
+        print(f'=> Task: {task}')
     else:
         print(f'=> Evaluating {model_name}') 
 
@@ -144,7 +150,8 @@ def main(args):
         if not os.path.exists(log_dir):
             os.makedirs(log_dir)
 
-        log_dir_tb = os.path.join(log_dir, datetime.now().strftime('%Y%m%d-%H%M%S'))
+        log_dir_tb = os.path.join(log_dir,
+                datetime.now().strftime('%Y%m%d-%H%M%S'))
         if not os.path.exists(log_dir_tb):
             os.makedirs(log_dir_tb)
 
@@ -186,13 +193,11 @@ def main(args):
 
     if args.enable_gpu:
         with strategy.scope():
-            model = construct_and_compile_model(model_type, model_name,
+            model = construct_and_compile_model(model_type, model_name, task,
                     checkpoint_file, checkpoints_dir, model_params)
     else:
-        model = construct_and_compile_model(model_type, model_name,
+        model = construct_and_compile_model(model_type, model_name, task,
                 checkpoint_file, checkpoints_dir, model_params)
-
-    model.summary()
 
     if training:
         train_list_file = os.path.join(data_path, 'train_list.txt')
@@ -209,15 +214,15 @@ def main(args):
                 create_list_file(val_dirs, val_list_file)
 
         train_data = tf.data.Dataset.from_generator(data_generator,
-                args=[train_list_file, training_steps, batch_size,
-                    "classification", coarse_targets, mask],
+                args=[train_list_file, training_steps, batch_size, task,
+                    coarse_targets, mask],
                 output_types=(tf.float32, tf.int16),
                 output_shapes=((batch_size, None, len(variables)),
                     (batch_size,)))
 
         val_data = tf.data.Dataset.from_generator(data_generator,
-                args=[val_list_file, validation_steps, batch_size,
-                    "classification", coarse_targets, mask],
+                args=[val_list_file, validation_steps, batch_size, task,
+                    coarse_targets, mask],
                 output_types=(tf.float32, tf.int16),
                 output_shapes=((batch_size, None, len(variables)),
                     (batch_size,)))
@@ -231,7 +236,7 @@ def main(args):
         callbacks = [checkpoint_callback, logger_callback, tensorboard_callback]
 
         if args.metrics_callback:
-            metrics_callback = MetricsCallback(model, train_data,
+            metrics_callback = MetricsCallback(model, task, train_data,
                     val_data, training_steps, validation_steps)
             callbacks.append(metrics_callback)
 
@@ -262,7 +267,7 @@ def main(args):
                 create_list_file(test_dirs, test_list_file)
 
         test_data = tf.data.Dataset.from_generator(data_generator,
-                args=[test_list_file, steps, batch_size, "classification",
+                args=[test_list_file, steps, batch_size, task,
                     coarse_targets, mask, shuffle],
                 output_types=(tf.float32, tf.int16),
                 output_shapes=((batch_size, None, len(variables)),
@@ -285,7 +290,10 @@ def main(args):
         y_pred = np.concatenate(y_pred).ravel()
         y_true = np.concatenate(y_true).ravel()
 
-        evaluate_classification_model(y_true, y_pred)
+        if task == 'classification':
+            evaluate_classification_model(y_true, y_pred)
+        else:
+            evaluate_regression_model(y_true, y_pred)
 
 
 if __name__ == '__main__':
