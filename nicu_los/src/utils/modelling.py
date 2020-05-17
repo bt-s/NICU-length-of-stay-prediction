@@ -65,7 +65,9 @@ def create_list_file(subject_dirs, list_file_path,
     with open(list_file_path, 'a') as f:
         for i, sd in enumerate(tqdm(subject_dirs)):
             ts = pd.read_csv(os.path.join(sd, ts_fname))
-            for row in range(1, len(ts)+1):
+            # Start from 4, since we only start predicting from the first four
+            # hours of the stay
+            for row in range(4, len(ts)+1):
                 f.write(f'{sd}, {row}\n')
 
 

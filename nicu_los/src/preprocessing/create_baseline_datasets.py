@@ -29,8 +29,13 @@ def parse_cl_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('-sp', '--subjects-path', type=str, default='data',
             help='Path to subject directories.')
-    parser.add_argument('-pi', '--pre-imputed', type=bool, default=False,
-            help='Whether to use pre-imputed time-series.')
+
+    parser.add_argument('--pre-imputed', dest='pre_imputed', action='store_true',
+        help='Whether to use pre-imputed time-series.')
+    parser.add_argument('--not-pre-imputed', dest='pre_imputed',
+            action='store_false')
+
+    parser.set_defaults(pre_imputed=False)
 
     return parser.parse_args(argv[1:])
 
@@ -118,9 +123,11 @@ def create_baseline_datasets_per_subject(subject_dir, variables, stat_fns,
         pre_imputed (bool): Whether to use pre-imputed time series
     """
     if pre_imputed:
-        ts = pd.read_csv(os.path.join(subject_dir, 'timeseries_imputed.csv'))
+        # We want sequences of four hours and longer, hence the 3
+        ts = pd.read_csv(os.path.join(subject_dir, 'timeseries_imputed.csv'))[3:]
     else:
-        ts = pd.read_csv(os.path.join(subject_dir, 'timeseries.csv'))
+        # We want sequences of four hours and longer, hence the 3
+        ts = pd.read_csv(os.path.join(subject_dir, 'timeseries.csv'))[3:]
 
     y = ts.LOS_HOURS.to_numpy()
     t_coarse = ts.TARGET_COARSE.to_numpy()
@@ -128,7 +135,7 @@ def create_baseline_datasets_per_subject(subject_dir, variables, stat_fns,
 
     X = np.zeros((len(ts), len(stat_fns)*len(subseqs)*len(variables)))
 
-    for i in range(1, len(ts)):
+    for i in range(1, len(ts)+1):
         X[i] = compute_stats_for_subseqs(ts[0:i], variables, stat_fns, subseqs)
 
     pi_str = ''
