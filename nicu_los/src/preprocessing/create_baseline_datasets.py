@@ -123,11 +123,9 @@ def create_baseline_datasets_per_subject(subject_dir, variables, stat_fns,
         pre_imputed (bool): Whether to use pre-imputed time series
     """
     if pre_imputed:
-        # We want sequences of four hours and longer, hence the 3
-        ts = pd.read_csv(os.path.join(subject_dir, 'timeseries_imputed.csv'))[3:]
+        ts = pd.read_csv(os.path.join(subject_dir, 'timeseries_imputed.csv'))
     else:
-        # We want sequences of four hours and longer, hence the 3
-        ts = pd.read_csv(os.path.join(subject_dir, 'timeseries.csv'))[3:]
+        ts = pd.read_csv(os.path.join(subject_dir, 'timeseries.csv'))
 
     y = ts.LOS_HOURS.to_numpy()
     t_coarse = ts.TARGET_COARSE.to_numpy()
@@ -136,7 +134,10 @@ def create_baseline_datasets_per_subject(subject_dir, variables, stat_fns,
     X = np.zeros((len(ts), len(stat_fns)*len(subseqs)*len(variables)))
 
     for i in range(1, len(ts)+1):
-        X[i] = compute_stats_for_subseqs(ts[0:i], variables, stat_fns, subseqs)
+        X[i-1] = compute_stats_for_subseqs(ts[0:i], variables, stat_fns, subseqs)
+
+    # Only keep sequences of four hours and longer
+    X, y, t_coarse, t_fine = X[3:], y[3:], t_coarse[3:], t_fine[3:]
 
     pi_str = ''
     if pre_imputed:
