@@ -213,16 +213,24 @@ def main(args):
                 val_dirs = f.read().splitlines()
                 create_list_file(val_dirs, val_list_file)
 
-        train_data = tf.data.Dataset.from_generator(data_generator,
-                args=[train_list_file, training_steps, batch_size, task,
-                    coarse_targets, mask],
+        # Instantiate the training and validation readers
+        train_reader = TimeSeriesReader(train_list_file,
+                coarse_targets=coarse_targets, mask=mask, name="Train reader")
+        val_reader = TimeSeriesReader(val_list_file,
+                coarse_targets=coarse_targets, mask=mask,
+                name="Validation reader")
+
+        train_data_generator = data_generator(train_reader, training_steps,
+                batch_size, task)
+        val_data_generator = data_generator(val_reader, validation_steps,
+                batch_size, task)
+
+        train_data = tf.data.Dataset.from_generator(lambda: train_data_generator,
                 output_types=(tf.float32, tf.int16),
                 output_shapes=((batch_size, None, len(variables)),
                     (batch_size,)))
 
-        val_data = tf.data.Dataset.from_generator(data_generator,
-                args=[val_list_file, validation_steps, batch_size, task,
-                    coarse_targets, mask],
+        val_data = tf.data.Dataset.from_generator(lambda: val_data_generator,
                 output_types=(tf.float32, tf.int16),
                 output_shapes=((batch_size, None, len(variables)),
                     (batch_size,)))
@@ -246,19 +254,14 @@ def main(args):
             callbacks.append(early_stopping_callback)
 
         print(f'=> Fitting the model')
-        model.fit(
-            train_data,
-            validation_data=val_data,
-            epochs=args.epochs,
-            initial_epoch=initial_epoch,
-            steps_per_epoch=training_steps,
-            validation_steps=validation_steps,
-            callbacks=callbacks)
+        model.fit(train_data, validation_data=val_data, epochs=args.epochs,
+            initial_epoch=initial_epoch, steps_per_epoch=training_steps,
+            validation_steps=validation_steps, callbacks=callbacks)
 
     else:
         test_list_file = os.path.join(data_path, 'test_list.txt')
-        batch_size = 8 
-        steps = 1000
+        batch_size = 16 
+        test_steps = 1000
         shuffle = False
 
         if not os.path.exists(test_list_file):
@@ -266,9 +269,12 @@ def main(args):
                 test_dirs = f.read().splitlines()
                 create_list_file(test_dirs, test_list_file)
 
-        test_data = tf.data.Dataset.from_generator(data_generator,
-                args=[test_list_file, steps, batch_size, task,
-                    coarse_targets, mask, shuffle],
+        test_reader = TimeSeriesReader(test_list_file,
+                coarse_targets=coarse_targets, mask=mask, name="Test reader")
+        test_data_generator = data_generator(test_reader, test_steps,
+                batch_size, task)
+
+        test_data = tf.data.Dataset.from_generator(test_data_generator,
                 output_types=(tf.float32, tf.int16),
                 output_shapes=((batch_size, None, len(variables)),
                     (batch_size,)))
