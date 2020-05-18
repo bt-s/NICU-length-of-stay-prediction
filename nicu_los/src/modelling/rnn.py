@@ -51,9 +51,9 @@ def parse_cl_args():
             help='Training batch size.')
     parser.add_argument('--epochs', type=int, default=20,
             help='Number of training epochs.')
-    parser.add_argument('--training-steps', type=int, default=2500,
+    parser.add_argument('--training-steps', type=int, default=None,
             help='Training steps per training epoch.')
-    parser.add_argument('--validation-steps', type=int, default=1000,
+    parser.add_argument('--validation-steps', type=int, default=None,
             help='Validation steps per training epoch.')
     parser.add_argument('--early-stopping', type=int, default=0,
             help=('Whether to use the early stopping callback. This number ' \
