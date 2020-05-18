@@ -49,7 +49,12 @@ def parse_cl_args():
     parser.add_argument('--not-pre-imputed', dest='pre_imputed',
             action='store_false')
 
-    parser.set_defaults(pre_imputed=False, grid_search=True,
+    parser.add_argument('--regularizer', type=str, default="l2",
+            help='The regularizer: "l1" or "l2".')
+    parser.add_argument('--C', type=float, default=1.0, help=('The Logistic ' \
+            'Regression C parameter (i.e. float between 0.0 and 1.0).'))
+
+    parser.set_defaults(pre_imputed=False, grid_search=False,
             coarse_targets=True)
 
     return parser.parse_args(argv[1:])
@@ -64,6 +69,8 @@ def main(args):
     grid_search = args.grid_search
     model_name = args.model_name
     pre_imputed = args.pre_imputed
+    regularizer = args.regularizer
+    C = args.C
 
     print(f'=> Training {model_name}')
     print(f'=> Pre-imputed features: {pre_imputed}')
@@ -106,35 +113,40 @@ def main(args):
     val_idx = np.hstack((np.ones(X_train.shape[0])*-1, np.ones(X_val.shape[0])))
     ps = PredefinedSplit(test_fold=val_idx)
 
-    # Initialize the logistic regression hyper-paramters
-    LR = LogisticRegression(random_state=42, multi_class="multinomial",
-            solver='saga')
-
     # Define the parameter grid
     if grid_search:
+        # Initialize the logistic regression hyper-paramters
+        LR = LogisticRegression(random_state=42, multi_class="multinomial",
+                solver='saga')
+
         regularizers = ['l1', 'l2']
         Cs = [1.0, 0.1, 0.01, 0.001, 0.0001, 0.00001 ]
         print(f'=> Doing a grid search with the following regularizers and Cs.')
         print(f'=> Regularizers: {regularizers} .')
         print(f'=> Cs: {Cs} .')
+
+        param_grid = dict(C=Cs, penalty=regularizers)
+
+        # Initialize the grid serach using the predefined train-validation split
+        clf = GridSearchCV(LR, param_grid=param_grid, n_jobs=8, cv=ps,
+                scoring=make_scorer(cohen_kappa_score), verbose=3)
+
+        # Fit the GridSearchCV to find the optimal estimator
+        print(f'=> Fitting the Logistic Regression model')
+        clf.fit(X, y)
+
+        # Extract the best estimator and fit again on all available training data
+        print(f'=> Fitting the best Logistic Regression model on all available data')
+        clf = clf.best_estimator_
+        clf.fit(X, y)
     else:
-        regularizers = ['l2']
-        Cs = [1.0]
-        print(f'=> Fitting with regularizer={regularizers} and C={Cs}.')
+        # Initialize the logistic regression estimator
+        clf = LogisticRegression(random_state=42, penalty=regularizer, C=C,
+                multi_class="multinomial", solver='saga')
 
-    param_grid = dict(C=Cs, penalty=regularizers)
-
-    # Initialize the grid serach using the predefined train-validation split
-    clf = GridSearchCV(LR, param_grid=param_grid, n_jobs=-1, cv=ps,
-            scoring=make_scorer(cohen_kappa_score), verbose=3)
-
-    # Fit the GridSearchCV to find the optimal estimator
-    print(f'=> Fitting the Logistic Regression model')
-    clf.fit(X, y)
-
-    # Extract the best estimator and fit again on all available training data
-    best_clf = clf.best_estimator_
-    best_clf.fit(X, y)
+        print(f'=> Fitting Logistic Regression model with ' \
+                'regularizer={regularizer} and C={C}')
+        clf.fit(X, y)
 
     # Predict on the training set
     train_preds = clf.predict_proba(X)
