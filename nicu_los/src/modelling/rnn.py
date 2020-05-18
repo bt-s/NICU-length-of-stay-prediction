@@ -95,14 +95,17 @@ def parse_cl_args():
 
     parser.add_argument('--enable-gpu', dest='enable_gpu',
             action='store_true')
-    parser.add_argument('--disable-gpu', dest='enable_gpu',
-            action='store_false')
+
+    parser.add_argument('--allow-growth', dest='allow_growth',
+            action='store_true', help=('Whether to allow growing memory for ' +
+                'the GPU'))
 
     parser.add_argument('--regression', dest='task', action='store_const',
             const='regression')
 
     parser.set_defaults(enable_gpu=False, training=True, coarse_targets=True,
-            mask_indicator=True, metrics_callback=False, task='classification')
+            mask_indicator=True, metrics_callback=False, task='classification',
+            allow_growth=False)
 
     return parser.parse_args(argv[1:])
 
@@ -111,9 +114,12 @@ def main(args):
     if args.enable_gpu:
         print('=> Using GPU(s)')
         physical_devices = tf.config.experimental.list_physical_devices('GPU')
-        assert len(physical_devices) > 0, "Not enough GPU hardware devices available"
+        assert len(physical_devices) > 0, \
+                "Not enough GPU hardware devices available"
         for i, _ in enumerate(physical_devices):
-            config = tf.config.experimental.set_memory_growth(physical_devices[i], True)
+            config = tf.config.experimental.set_memory_growth(
+                    physical_devices[i], args.allow_growth)
+        print(f'=> Allow growth: {args.allow_growth}')
         strategy = tf.distribute.MirroredStrategy()
 
     else:
