@@ -91,29 +91,44 @@ def data_generator(reader, steps, batch_size, task, shuffle=True):
         OR (if task == 'classification'):
             t ():
     """
-    chunk_size = steps*batch_size
+    n_examples = reader.get_number_of_sequences()
+    if not steps:
+        steps = (n_examples + batch_size - 1) // batch_size
+        n_examples_epoch = n_examples
+    else:
+        n_examples_epoch = steps * batch_size
+    print(f"\n==> {reader.name} -- number of examples per epoch:",
+            n_examples_epoch)
+
+    # Set a limit on the size of the chunk to be read
+    chunk_size = min(1024, steps) * batch_size
 
     while True:
         # Only shuffle when the current reader index is 0, or if we are close
         # to the end of the reader -- then we reset the index
         if shuffle and (reader.current_index == 0 or reader.current_index >
-                (reader.get_number_of_sequences() - chunk_size)):
+                (n_examples - chunk_size)):
             reader.random_shuffle()
             reader.current_index = 0 
 
-        data = reader.read_chunk(chunk_size)
+        n_examples_remaining = n_examples_epoch
+        while n_examples_remaining > 0:
+            current_size = min(chunk_size, n_examples_remaining)
+            n_examples_remaining -= current_size
 
-        (Xs, ys, ts) = sort_and_batch_shuffle(data, batch_size)
+            data = reader.read_chunk(current_size)
 
-        for i in range(0, chunk_size, batch_size):
-            X = zero_pad_timeseries(Xs[i:i + batch_size])
-            y = ys[i:i+batch_size]
-            t = ts[i:i+batch_size]
+            (Xs, ys, ts) = sort_and_batch_shuffle(data, batch_size)
 
-            if task == 'regression':
-                yield X, y
-            else:
-                yield X, t
+            for i in range(0, current_size, batch_size):
+                X = zero_pad_timeseries(Xs[i:i + batch_size])
+                y = ys[i:i+batch_size]
+                t = ts[i:i+batch_size]
+
+                if task == 'regression':
+                    yield X, y
+                else:
+                    yield X, t
 
 
 def get_baseline_datasets(subject_dirs, coarse_targets=False, pre_imputed=False,
