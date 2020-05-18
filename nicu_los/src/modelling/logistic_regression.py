@@ -167,7 +167,11 @@ def main(args):
         f_name = os.path.join(args.models_path, f'results_{model_name}.txt')
 
         with open(f_name, "a") as f:
-            f.write(f'Best LR model: {clf.best_estimator_}:\n')
+            if grid_search:
+                f.write(f'Best LR model: {clf.best_estimator_}:\n')
+            else:
+                f.write(f'Best LR model: {clf.get_params}:\n')
+
             f.write(f'- Training scores:\n')
             for k, v in train_scores.items():
                 f.write(f'\t\t{k}: {v}\n')
