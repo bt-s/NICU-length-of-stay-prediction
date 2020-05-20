@@ -63,18 +63,18 @@ def create_histogram(input_data, title='', rotation=0, fig_size=(12.376, 8),
     if legend: plt.legend(loc='upper right', fontsize='xx-large', labels=legend)
 
     # Set the x- and y-labels
-    if xlabel: plt.xlabel(xlabel, fontsize=16)
-    if ylabel: plt.ylabel(ylabel, fontsize=16)
+    if xlabel: plt.xlabel(xlabel, fontsize=22)
+    if ylabel: plt.ylabel(ylabel, fontsize=22)
 
     # Make sure that x-ticks are positioned correctly
     plt.subplots_adjust(bottom=0.3)
     if xticks:
         plt.xticks(np.arange(len(xticks)), xticks, rotation=rotation,
-                fontsize=16)
+                fontsize=22)
 
     # Set the size of the x- and y-ticks
-    plt.yticks(fontsize=16)
-    plt.xticks(fontsize=16)
+    plt.yticks(fontsize=22)
+    plt.xticks(fontsize=22)
 
     plt.tight_layout()
 
