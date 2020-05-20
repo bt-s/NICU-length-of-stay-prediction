@@ -127,22 +127,22 @@
       "MAX": 150
     },
     "TEMPERATURE": {
-      "MIN": 25,
-      "MAX": 40
+      "MIN": 20,
+      "MAX": 44
     },
     "WEIGHT": {
       "MIN": 0.4,
       "MAX": 7
     }
   },
-  "normal_values": {
-    "BILIRUBIN_DIRECT": 0.3,
-    "BILIRUBIN_INDIRECT": 6,
+  "imputation_values": {
+    "BILIRUBIN_DIRECT": 0.0,
+    "BILIRUBIN_INDIRECT": 0.0,
     "BLOOD_PRESSURE_DIASTOLIC": 37,
     "BLOOD_PRESSURE_SYSTOLIC": 67,
     "CAPILLARY_REFILL_RATE": 0,
     "FRACTION_INSPIRED_OXYGEN": 21,
-    "HEART_RATE": 156,
+    "HEART_RATE": 155,
     "HEIGHT": {
       "22": "31.6",
       "23": "32.6",
@@ -170,7 +170,7 @@
     },
     "OXYGEN_SATURATION": 97,
     "PH": 7.3,
-    "RESPIRATORY_RATE": 48,
+    "RESPIRATORY_RATE": 43,
     "TEMPERATURE": 36.2,
     "WEIGHT": {
       "22": "0.60",

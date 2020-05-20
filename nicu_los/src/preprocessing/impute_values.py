@@ -32,19 +32,19 @@ def parse_cl_args():
     return parser.parse_args(argv[1:])
 
 
-def impute(sd, normal_values, method='ffill', mask=True):
+def impute(sd, imputation_values, method='ffill', mask=True):
     """Forward fill impute missing values with normal values
 
     Args:
         sd (str): String to the subject directory
-        normal_values (dict): Normal values for selected variables
+        imputation_values (dict): Normal values for selected variables
         method (str): Either 'ffill' or 'zeros' -- determines impute method
         mask (bool): Whether to create binary imputation masks
     """
     ts = pd.read_csv(os.path.join(sd, 'timeseries.csv'))
     ts = ts.set_index('CHARTTIME')
 
-    variables = list(normal_values.keys())
+    variables = list(imputation_values.keys())
 
     if mask:
         # Create an imputation mask
@@ -59,11 +59,11 @@ def impute(sd, normal_values, method='ffill', mask=True):
     for var in variables:
         if math.isnan(ts[var].iloc[0]):
             if var == 'WEIGHT' or var == 'HEIGHT':
-                ts[var].iloc[0] = normal_values[var] \
+                ts[var].iloc[0] = imputation_values[var] \
                         [str(int(round(ts['GESTATIONAL_AGE_DAYS'].iloc[0] / 7)
                             ))]
             else:
-                ts[var].iloc[0] = normal_values[var]
+                ts[var].iloc[0] = imputation_values[var]
 
 
     if method == 'ffill':
@@ -87,7 +87,7 @@ def main(args):
 
     with open('nicu_los/config.json') as f:
         config = json.load(f)
-        normal_values = config['normal_values']
+        imputation_values = config['imputation_values']
 
     print(f'Starting {impute_method} imputing with normal values.' \
             f'Binary imputation mask: {args.mask}')
@@ -96,7 +96,7 @@ def main(args):
 
     with mp.Pool() as pool:
         for _ in tqdm(pool.istarmap(impute, zip(subject_dirs,
-            repeat(normal_values), repeat(impute_method),
+            repeat(imputation_values), repeat(impute_method),
             repeat(args.mask))), total=len(subject_dirs)):
             pass
 
