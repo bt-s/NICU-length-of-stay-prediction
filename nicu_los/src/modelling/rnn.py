@@ -226,9 +226,9 @@ def main(args):
                 name="Validation reader")
 
         train_data_generator = data_generator(train_reader, training_steps,
-                batch_size, task, shuffle=True)
+                batch_size, task)
         val_data_generator = data_generator(val_reader, validation_steps,
-                batch_size, task, shuffle=False)
+                batch_size, task)
 
         train_data = tf.data.Dataset.from_generator(lambda: train_data_generator,
                 output_types=(tf.float32, tf.int16),
