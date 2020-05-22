@@ -36,7 +36,7 @@ def parse_cl_args():
 
     parser.add_argument('--coarse-targets', dest='coarse_targets',
             action='store_true')
-    parser.add_argument('--no-coarse-targets', dest='coarse_targets',
+    parser.add_argument('--fine-targets', dest='coarse_targets',
             action='store_false')
 
     parser.set_defaults(coarse_targets=True)
