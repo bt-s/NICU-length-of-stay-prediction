@@ -325,6 +325,23 @@ def construct_rnn(input_dimension, output_dimension, model_type='lstm',
 
 def construct_lstm_fcn(input_dimension, output_dimension, dropout=0.8,
         hid_dimension_lstm=8, squeeze_and_excite_block=True, model_name=""):
+    """Construct an LSTM-FCN model 
+    
+    (Karim et al. 2019 - Multivariate LSTM-FCNs for time series classification)
+
+    Args:
+        input_dimension (int): Input dimension of the model
+        output_dimension (int): Output dimension of the model
+        dropout (float): Amount of dropout to apply
+        hid_dimension (int): Dimension of the hidden layer (i.e. # of unit in
+                             the RNN cell)
+        squeeze_and_excite_block (bool): Whether to use the squeeze and 
+                                         exicitation block
+        model_name (str): Name of the model
+
+    Returns:
+        model (tf.keras.Model): Constructed LSTM-FCN model
+    """
 
     inputs = Input(shape=(None, input_dimension))
 
@@ -332,7 +349,8 @@ def construct_lstm_fcn(input_dimension, output_dimension, dropout=0.8,
     X1 = LSTM(hid_dimension_lstm)(X1)
     X1 = Dropout(dropout)(X1)
 
-    X2 = Conv1D(128, 8, padding='same', kernel_initializer='he_uniform')(inputs)
+    X2 = Conv1D(128, 8, padding='same',
+            kernel_initializer='he_uniform')(inputs)
     X2 = BatchNormalization()(X2)
     X2 = Activation('relu')(X2)
     if squeeze_and_excite_block:
@@ -362,139 +380,6 @@ def construct_lstm_fcn(input_dimension, output_dimension, dropout=0.8,
     model = Model(inputs=inputs, outputs=outputs, name=model_name)
 
     return model
-
-
-def construct_and_compile_model(model_type, model_name, task, checkpoint_file,
-        checkpoints_dir, model_params={}):
-    """Construct and compile a model of a specific type
-
-    Args:
-        model_type (str): The type of model to be constructed
-        model_name (str): The name of model to be constructed
-        task (str): Either 'regression' or 'classification'
-        checkpoint_file (str): Name of a checkpoint file
-        checkpoints_dir (str): Path to the checkpoints directory
-        model_params (dict): Possible hyper-parameters for the model to be
-                             constructed
-
-    Returns:
-        model (tf.keras.Model): Constructed and compiled model
-    """
-    n_cells = model_params['n_cells']
-    input_dimension = model_params['input_dimension']
-    output_dimension = model_params['output_dimension']
-    dropout = model_params['dropout']
-    global_dropout = model_params['global_dropout']
-    hid_dimension = model_params['hidden_dimension']
-    multiplier = model_params['multiplier']
-
-    if task == 'classification':
-        loss_fn = SparseCategoricalCrossentropy()
-        metrics = ['accuracy']
-    elif task == 'regression':
-        loss_fn = MeanAbsoluteError()
-        metrics = ['mse']
-        output_dimension = 1
-    else:
-        raise ValueError('Argument "task" must be one of "classification" ' \
-                'or "regression"')
-
-    if model_type == 'lstm' or model_type == 'gru':
-        model = construct_rnn(input_dimension, output_dimension, model_type,
-                n_cells, dropout, hid_dimension, model_name)
-    elif model_type == 'lstm_cw' or model_type == 'gru_cw':
-        model = construct_channel_wise_rnn(input_dimension, output_dimension,
-                model_type, dropout, global_dropout, hid_dimension, multiplier,
-                model_name)
-    elif model_type == 'lstm_fcn':
-        model = construct_lstm_fcn(input_dimension, output_dimension, dropout,
-                hid_dimension, False, model_name)
-    else:
-        raise ValueError(f'Model type {model_type} is not supported.')
-
-    if checkpoint_file:
-        model.load_weights(os.path.join(checkpoints_dir, checkpoint_file))
-
-    model.compile(optimizer=Adam(), loss=loss_fn, metrics=metrics)
-
-    model.summary()
-
-    return model
-
-
-def squeeze_excite_block(X):
-    filters = X.shape[-1]
-
-    se = GlobalAveragePooling1D()(X)
-    se = Reshape((1, filters))(se)
-    se = Dense(filters // 16,  activation='relu',
-            kernel_initializer='he_normal', use_bias=False)(se)
-    se = Dense(filters, activation='sigmoid', kernel_initializer='he_normal',
-            use_bias=False)(se)
-    se = multiply([X, se])
-
-    return se
-
-
-class MetricsCallback(Callback):
-    def __init__(self, model, task, training_data, validation_data,
-            training_steps, validation_steps):
-        self.model = model
-        self.task = task
-        self.training_data = training_data
-        self.validation_data = validation_data
-
-        self.training_steps = training_steps
-        self.validation_steps = validation_steps
-
-    def on_epoch_end(self, epoch, logs=None):
-        print('\n=> Predict on training data:\n')
-        y_true, y_pred = [], []
-        for batch, (x, y) in enumerate(self.training_data):
-            if batch > self.training_steps:
-                break
-
-            if self.task == 'classification':
-                y_pred.append(np.argmax(self.model.predict_on_batch(x), axis=1))
-            else:
-                y_pred.append(self.model.predict_on_batch(x))
-
-            y_true.append(y.numpy())
-        for i, _ in enumerate(y_pred):
-            print(y_pred[i])
-            print(y_true[i])
-            print()
-
-        if self.task == 'classification':
-            evaluate_classification_model(np.concatenate(y_true, axis=0),
-                    np.concatenate(y_pred, axis=0))
-        else:
-            evaluate_regression_model(np.concatenate(y_true, axis=0),
-                    np.concatenate(y_pred, axis=0))
-
-        print('\n=> Predict on validation data:\n')
-        y_true, y_pred = [], []
-        for batch, (x, y) in enumerate(self.validation_data):
-            if batch > self.validation_steps:
-                break
-
-            if self.task == 'classification':
-                y_pred.append(np.argmax(self.model.predict_on_batch(x), axis=1))
-            else:
-                y_pred.append(self.model.predict_on_batch(x))
-
-            y_true.append(y.numpy())
-        for i, _ in enumerate(y_pred):
-            print(y_pred[i])
-            print(y_true[i])
-            print()
-
-        if self.task == 'classification':
-            evaluate_classification_model(np.concatenate(y_true, axis=0),
-                    np.concatenate(y_pred, axis=0))
-        else:
-            evaluate_regression_model(np.concatenate(y_true, axis=0),
-                    np.concatenate(y_pred, axis=0))
 
 
 def construct_channel_wise_rnn(input_dimension, output_dimension,
@@ -560,4 +445,162 @@ def construct_channel_wise_rnn(input_dimension, output_dimension,
     model = Model(inputs=inputs, outputs=outputs, name=model_name)
 
     return model
+
+
+def construct_and_compile_model(model_type, model_name, task, checkpoint_file,
+        checkpoints_dir, model_params={}):
+    """Construct and compile a model of a specific type
+
+    Args:
+        model_type (str): The type of model to be constructed
+        model_name (str): The name of model to be constructed
+        task (str): Either 'regression' or 'classification'
+        checkpoint_file (str): Name of a checkpoint file
+        checkpoints_dir (str): Path to the checkpoints directory
+        model_params (dict): Possible hyper-parameters for the model to be
+                             constructed
+
+    Returns:
+        model (tf.keras.Model): Constructed and compiled model
+    """
+    n_cells = model_params['n_cells']
+    input_dimension = model_params['input_dimension']
+    output_dimension = model_params['output_dimension']
+    dropout = model_params['dropout']
+    global_dropout = model_params['global_dropout']
+    hid_dimension = model_params['hidden_dimension']
+    multiplier = model_params['multiplier']
+
+    if task == 'classification':
+        loss_fn = SparseCategoricalCrossentropy()
+        metrics = ['accuracy']
+    elif task == 'regression':
+        loss_fn = MeanAbsoluteError()
+        metrics = ['mse']
+        output_dimension = 1
+    else:
+        raise ValueError('Argument "task" must be one of "classification" ' \
+                'or "regression"')
+
+    if model_type == 'lstm' or model_type == 'gru':
+        model = construct_rnn(input_dimension, output_dimension, model_type,
+                n_cells, dropout, hid_dimension, model_name)
+    elif model_type == 'lstm_cw' or model_type == 'gru_cw':
+        model = construct_channel_wise_rnn(input_dimension, output_dimension,
+                model_type, dropout, global_dropout, hid_dimension, multiplier,
+                model_name)
+    elif model_type == 'lstm_fcn':
+        model = construct_lstm_fcn(input_dimension, output_dimension, dropout,
+                hid_dimension, False, model_name)
+    else:
+        raise ValueError(f'Model type {model_type} is not supported.')
+
+    if checkpoint_file:
+        print(f"=> Loading weights from checkpoint: {checkpoint_file}")
+        model.load_weights(os.path.join(checkpoints_dir, checkpoint_file))
+
+    model.compile(optimizer=Adam(), loss=loss_fn, metrics=metrics)
+
+    model.summary()
+
+    return model
+
+
+def squeeze_excite_block(X):
+    """Squeeze and excitation block
+    
+    (Hu et al. 2019 - Squeeze-and-Excitation Networks)
+    
+    Args:
+        X (tf.Tensor): Input tensor
+        
+    Returns:
+        X (tf.Tensor): Transformed input tensor 
+    """
+    filters = X.shape[-1]
+    r = 16
+
+    # Squeeze
+    se = GlobalAveragePooling1D()(X)
+    se = Reshape((1, filters))(se)
+
+    # Excite
+    se = Dense(filters // r,  activation='relu',
+            kernel_initializer='he_normal', use_bias=False)(se)
+    se = Dense(filters, activation='sigmoid', kernel_initializer='he_normal',
+            use_bias=False)(se)
+
+    # Transform the input
+    X = multiply([X, se])
+
+    return X
+
+
+class MetricsCallback(Callback):
+    def __init__(self, model, task, training_data, validation_data,
+            training_steps, validation_steps):
+        """Callback to compute metrics after an epoch has ended
+        
+        Args:
+            model (tf.keras.model): TensorFlow (Keras) model
+            task (str): Classification or regression
+            training_data (tf.data.Dataset)
+            validation_data (tf.data.Dataset)
+            training_steps (int)
+            validation_steps (int)
+        """
+        self.model = model
+        self.task = task
+        self.training_data = training_data
+        self.validation_data = validation_data
+
+        self.training_steps = training_steps
+        self.validation_steps = validation_steps
+
+    def on_epoch_end(self, epoch, logs=None):
+        """The callback
+
+        Args:
+            epoch (int): Identifier of the current epoch 
+        """
+        print('\n=> Predict on training data:\n')
+        y_true, y_pred = [], []
+        for batch, (x, y) in enumerate(self.training_data):
+            if batch > self.training_steps:
+                break
+
+            if self.task == 'classification':
+                y_pred.append(np.argmax(self.model.predict_on_batch(x), axis=1))
+            else:
+                y_pred.append(self.model.predict_on_batch(x))
+
+            y_true.append(y.numpy())
+
+        if self.task == 'classification':
+            evaluate_classification_model(np.concatenate(y_true, axis=0),
+                    np.concatenate(y_pred, axis=0))
+        else:
+            evaluate_regression_model(np.concatenate(y_true, axis=0),
+                    np.concatenate(y_pred, axis=0))
+
+        print('\n=> Predict on validation data:\n')
+        y_true, y_pred = [], []
+        for batch, (x, y) in enumerate(self.validation_data):
+            if batch > self.validation_steps:
+                break
+
+            if self.task == 'classification':
+                y_pred.append(np.argmax(self.model.predict_on_batch(x), axis=1))
+            else:
+                y_pred.append(self.model.predict_on_batch(x))
+
+            y_true.append(y.numpy())
+
+        if self.task == 'classification':
+            evaluate_classification_model(np.concatenate(y_true, axis=0),
+                    np.concatenate(y_pred, axis=0))
+        else:
+            evaluate_regression_model(np.concatenate(y_true, axis=0),
+                    np.concatenate(y_pred, axis=0))
+
 
