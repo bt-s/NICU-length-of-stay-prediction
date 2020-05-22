@@ -79,18 +79,18 @@ def parse_cl_args():
             action='store_true')
     parser.add_argument('--no-mask-indicator', dest='mask_indicator',
             action='store_false')
+    parser.add_argument('--no-gestational-age', dest='gestational_age',
+            action='store_false')
 
     parser.add_argument('--training', dest='training', action='store_true')
     parser.add_argument('--testing', dest='training', action='store_false')
 
     parser.add_argument('--metrics-callback', dest='metrics_callback',
             action='store_true')
-    parser.add_argument('--no-metrics-callback', dest='metrics_callback',
-            action='store_false')
 
     parser.add_argument('--coarse-targets', dest='coarse_targets',
             action='store_true')
-    parser.add_argument('--no-coarse-targets', dest='coarse_targets',
+    parser.add_argument('--fine-targets', dest='coarse_targets',
             action='store_false')
 
     parser.add_argument('--enable-gpu', dest='enable_gpu',
@@ -105,12 +105,26 @@ def parse_cl_args():
 
     parser.set_defaults(enable_gpu=False, training=True, coarse_targets=True,
             mask_indicator=True, metrics_callback=False, task='classification',
-            allow_growth=False)
+            allow_growth=False, gestational_age=True)
 
     return parser.parse_args(argv[1:])
 
 
 def main(args):
+    batch_size = args.batch_size
+    checkpoint_file = args.checkpoint_file
+    coarse_targets = args.coarse_targets
+    data_path = args.data_path
+    early_stopping = args.early_stopping
+    gestational_age = args.gestational_age
+    mask = args.mask_indicator
+    model_name = args.model_name
+    model_type = args.model_type
+    task = args.task
+    training = args.training
+    training_steps = args.training_steps
+    validation_steps = args.validation_steps
+
     if args.enable_gpu:
         print('=> Using GPU(s)')
         physical_devices = tf.config.experimental.list_physical_devices('GPU')
@@ -126,14 +140,6 @@ def main(args):
         print('=> Using CPU(s)')
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
-    coarse_targets = args.coarse_targets
-    model_name = args.model_name
-    model_type = args.model_type
-    task = args.task
-
-    early_stopping = args.early_stopping
-    training = args.training
-
     if training:
         print(f'=> Training {model_name}') 
         print(f'=> Early stopping: {early_stopping}')
@@ -141,44 +147,37 @@ def main(args):
     else:
         print(f'=> Evaluating {model_name}') 
 
-    data_path = args.data_path
+    print(f'=> Coarse targets: {coarse_targets}')
+    print(f'=> Using mask: {mask}')
+    print(f'=> Using gestational age variable: {gestational_age}')
+    print(f'=> Batch size: {batch_size}')
+
     model_path = args.model_path
     if not os.path.exists(model_path):
         os.makedirs(model_path)
 
-    checkpoint_file = args.checkpoint_file
     checkpoints_dir = os.path.join(model_path, 'checkpoints')
     if not os.path.exists(checkpoints_dir):
         os.makedirs(checkpoints_dir)
 
     if training:
-        log_dir = os.path.join(model_path, 'logs', model_name)
-        if not os.path.exists(log_dir):
-            os.makedirs(log_dir)
+        log_dir = os.path.join(model_path, 'logs', model_name + \
+                f'-batch{batch_size}-steps{training_steps}')
+        if not os.path.exists(logger_dir):
+            os.makedirs(logger_dir)
 
         log_dir_tb = os.path.join(log_dir,
                 datetime.now().strftime('%Y%m%d-%H%M%S'))
         if not os.path.exists(log_dir_tb):
             os.makedirs(log_dir_tb)
 
-    mask = args.mask_indicator
-    training_steps = args.training_steps
-    validation_steps = args.validation_steps
-    initial_epoch = args.initial_epoch
-    batch_size = args.batch_size
-
-    print(f'=> Coarse targets: {coarse_targets}')
-    print(f'=> Using mask: {mask}')
-    print(f'=> Batch size: {batch_size}')
-
-    checkpoint_path = os.path.join(checkpoints_dir, f'{model_name}-' + \
-            f'batch{batch_size}-steps{training_steps}-epoch' + \
-            '{epoch:02d}.h5')
-
     # Obtain the training variables
     with open('nicu_los/config.json') as f:
         config = json.load(f)
         variables = config['variables']
+
+        if not gestational_age and "GESTATIONAL_AGE_DAYS" in variables:
+            variables.remove("GESTATIONAL_AGE_DAYS")
 
         if mask:
             variables = variables + ['mask_' + v for v in variables]
@@ -227,9 +226,9 @@ def main(args):
                 name="Validation reader")
 
         train_data_generator = data_generator(train_reader, training_steps,
-                batch_size, task)
+                batch_size, task, shuffle=True)
         val_data_generator = data_generator(val_reader, validation_steps,
-                batch_size, task)
+                batch_size, task, shuffle=False)
 
         train_data = tf.data.Dataset.from_generator(lambda: train_data_generator,
                 output_types=(tf.float32, tf.int16),
@@ -242,11 +241,14 @@ def main(args):
                     (batch_size,)))
 
         # Get callbacks
+        checkpoint_path = os.path.join(checkpoints_dir, f'{model_name}-' + \
+                f'batch{batch_size}-steps{training_steps}-epoch' + \
+                '{epoch:02d}.h5')
         checkpoint_callback = ModelCheckpoint(checkpoint_path)
         tensorboard_callback = tf.keras.callbacks.TensorBoard(
                 log_dir=log_dir_tb, histogram_freq=1)
-        logger_callback = CSVLogger(os.path.join(model_path, 'logs', model_name,
-            'logs.csv'))
+        logger_callback = CSVLogger(os.path.join(log_dir, 'logs.csv'))
+
         callbacks = [checkpoint_callback, logger_callback, tensorboard_callback]
 
         if args.metrics_callback:
@@ -256,12 +258,12 @@ def main(args):
 
         if early_stopping:
             early_stopping_callback = EarlyStopping(monitor='val_loss',
-                    min_delta=0, patience=args.early_stopping)
+                    min_delta=0, patience=early_stopping)
             callbacks.append(early_stopping_callback)
 
         print(f'=> Fitting the model')
         model.fit(train_data, validation_data=val_data, epochs=args.epochs,
-            initial_epoch=initial_epoch, steps_per_epoch=training_steps,
+            initial_epoch=args.initial_epoch, steps_per_epoch=training_steps,
             validation_steps=validation_steps, callbacks=callbacks)
 
     else:
