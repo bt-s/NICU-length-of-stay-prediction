@@ -323,6 +323,54 @@ def construct_rnn(input_dimension, output_dimension, model_type='lstm',
     return model
 
 
+def construct_fcn(input_dimension, output_dimension, hid_dimension_lstm=8,
+        model_name=""):
+    """Construct an FCN model for multivariate time series classification
+    
+    (Karim et al. 2019 - Multivariate LSTM-FCNs for time series classification)
+
+    Args:
+        input_dimension (int): Input dimension of the model
+        output_dimension (int): Output dimension of the model
+        hid_dimension (int): Dimension of the hidden layer (i.e. # of unit in
+                             the RNN cell)
+        model_name (str): Name of the model
+
+    Returns:
+        model (tf.keras.Model): Constructed CN model
+    """
+
+    inputs = Input(shape=(None, input_dimension))
+
+    X = Conv1D(128, 8, padding='same',
+           kernel_initializer='he_uniform')(inputs)
+    X = BatchNormalization()(X2)
+    X = Activation('relu')(X2)
+    X = squeeze_excite_block(X2)
+
+    X = Conv1D(256, 5, padding='same', kernel_initializer='he_uniform')(X2)
+    X = BatchNormalization()(X2)
+    X = Activation('relu')(X2)
+    X = squeeze_excite_block(X2)
+
+    X = Conv1D(128, 3, padding='same', kernel_initializer='he_uniform')(X2)
+    X = BatchNormalization()(X2)
+    X = Activation('relu')(X2)
+
+    X = GlobalAveragePooling1D()(X2)
+
+    if output_dimension != 1:
+        # Classification
+        outputs = Dense(units=output_dimension, activation='softmax')(X)
+    else:
+        # Regression 
+        outputs = Dense(units=output_dimension)(X)
+
+    model = Model(inputs=inputs, outputs=outputs, name=model_name)
+
+    return model
+
+
 def construct_lstm_fcn(input_dimension, output_dimension, dropout=0.8,
         hid_dimension_lstm=8, model_name=""):
     """Construct an LSTM-FCN model 
@@ -484,6 +532,9 @@ def construct_and_compile_model(model_type, model_name, task, checkpoint_file,
     elif model_type == 'lstm_cw' or model_type == 'gru_cw':
         model = construct_channel_wise_rnn(input_dimension, output_dimension,
                 model_type, dropout, global_dropout, hid_dimension, multiplier,
+                model_name)
+    elif model_type == 'fcn':
+        model = construct_fcn(input_dimension, output_dimension, hid_dimension,
                 model_name)
     elif model_type == 'lstm_fcn':
         model = construct_lstm_fcn(input_dimension, output_dimension, dropout,
