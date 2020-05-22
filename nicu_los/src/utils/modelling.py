@@ -324,7 +324,7 @@ def construct_rnn(input_dimension, output_dimension, model_type='lstm',
 
 
 def construct_lstm_fcn(input_dimension, output_dimension, dropout=0.8,
-        hid_dimension_lstm=8, squeeze_and_excite_block=True, model_name=""):
+        hid_dimension_lstm=8, model_name=""):
     """Construct an LSTM-FCN model 
     
     (Karim et al. 2019 - Multivariate LSTM-FCNs for time series classification)
@@ -335,8 +335,6 @@ def construct_lstm_fcn(input_dimension, output_dimension, dropout=0.8,
         dropout (float): Amount of dropout to apply
         hid_dimension (int): Dimension of the hidden layer (i.e. # of unit in
                              the RNN cell)
-        squeeze_and_excite_block (bool): Whether to use the squeeze and 
-                                         exicitation block
         model_name (str): Name of the model
 
     Returns:
@@ -353,14 +351,12 @@ def construct_lstm_fcn(input_dimension, output_dimension, dropout=0.8,
             kernel_initializer='he_uniform')(inputs)
     X2 = BatchNormalization()(X2)
     X2 = Activation('relu')(X2)
-    if squeeze_and_excite_block:
-        X2 = squeeze_excite_block(X2)
+    X2 = squeeze_excite_block(X2)
 
     X2 = Conv1D(256, 5, padding='same', kernel_initializer='he_uniform')(X2)
     X2 = BatchNormalization()(X2)
     X2 = Activation('relu')(X2)
-    if squeeze_and_excite_block:
-        X2 = squeeze_excite_block(X2)
+    X2 = squeeze_excite_block(X2)
 
     X2 = Conv1D(128, 3, padding='same', kernel_initializer='he_uniform')(X2)
     X2 = BatchNormalization()(X2)
@@ -491,7 +487,7 @@ def construct_and_compile_model(model_type, model_name, task, checkpoint_file,
                 model_name)
     elif model_type == 'lstm_fcn':
         model = construct_lstm_fcn(input_dimension, output_dimension, dropout,
-                hid_dimension, False, model_name)
+                hid_dimension, model_name)
     else:
         raise ValueError(f'Model type {model_type} is not supported.')
 
