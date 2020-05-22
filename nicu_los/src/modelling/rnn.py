@@ -147,7 +147,8 @@ def main(args):
     else:
         print(f'=> Evaluating {model_name}') 
 
-    print(f'=> Coarse targets: {coarse_targets}')
+    if task == "classification":
+        print(f'=> Coarse targets: {coarse_targets}')
     print(f'=> Using mask: {mask}')
     print(f'=> Using gestational age variable: {gestational_age}')
     print(f'=> Batch size: {batch_size}')
