@@ -163,8 +163,8 @@ def main(args):
     if training:
         log_dir = os.path.join(model_path, 'logs', model_name + \
                 f'-batch{batch_size}-steps{training_steps}')
-        if not os.path.exists(logger_dir):
-            os.makedirs(logger_dir)
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
 
         log_dir_tb = os.path.join(log_dir,
                 datetime.now().strftime('%Y%m%d-%H%M%S'))
