@@ -37,18 +37,28 @@ def parse_cl_args():
     parser.add_argument('--not-pre-imputed', dest='pre_imputed',
             action='store_false')
 
-    parser.set_defaults(pre_imputed=False)
+    parser.add_argument('--training', dest='training', action='store_true')
+    parser.add_argument('--testing', dest='training', action='store_false')
+
+    parser.add_argument('--K', type=int, default=20, help=('How often to ' +
+        'perform bootstrap sampling without replacement when evaluating ' +
+        'the model'))
+    parser.add_argument('--samples', type=int, default=16000, help=('Number ' +
+    'of test samples per bootstrap'))
+
+    parser.set_defaults(pre_imputed=False, training=True)
 
     return parser.parse_args(argv[1:])
 
 
 def main(args):
-    if not os.path.exists(args.models_path):
-        os.makedirs(args.models_path)
     pre_imputed = args.pre_imputed
     data_path = args.subjects_path
     model_name = args.model_name
+    models_path = args.models_path
 
+    if not os.path.exists(models_path):
+        os.makedirs(models_path)
     print(f'=> Training {model_name}.')
     print(f'=> Pre-imputed features: {pre_imputed}')
 
@@ -83,43 +93,71 @@ def main(args):
     X_train = np.concatenate((X_train, X_val))
     y_train = np.hstack((y_train, y_val))
 
-    print(f'=> Fitting the Linear Regression model')
-    clf = LinearRegression(n_jobs=-1)
+    if args.training:
+        print(f'=> Fitting the Linear Regression model')
+        clf = LinearRegression(n_jobs=-1)
 
-    # Fit the model
-    clf.fit(X_train, y_train)
+        # Fit the model
+        clf.fit(X_train, y_train)
 
-    # Predict on the training set
-    train_preds = clf.predict(X_train)
-    train_preds = np.maximum(train_preds, np.min(y_train))
+        # Predict on the training set
+        train_preds = clf.predict(X_train)
+        # Remaining LOS cannot be negative
+        train_preds = np.maximum(train_preds, 0)
 
-    print('=> Evaluate fitted model on the training set')
-    train_scores = evaluate_regression_model(y_train, train_preds)
+        print('=> Evaluate fitted model on the training set')
+        train_scores = evaluate_regression_model(y_train, train_preds)
 
-    # Predict on the testing set
-    test_preds = clf.predict(X_test)
-    test_preds = np.maximum(test_preds, np.min(y_train))
+        # Predict on the testing set
+        test_preds = clf.predict(X_test)
+        # Remaining LOS cannot be negative
+        test_preds = np.maximum(test_preds, 0)
 
-    print('=> Evaluate fitted model on the test set')
-    test_scores = evaluate_regression_model(y_test, test_preds)
+        print('=> Evaluate fitted model on the test set')
+        test_scores = evaluate_regression_model(y_test, test_preds)
 
-    print('=> Saving the model')
-    f_name = os.path.join(args.models_path, f'results_{model_name}.txt')
+        print('=> Saving the model')
+        f_name = os.path.join(models_path, f'results_{model_name}.txt')
 
-    with open(f_name, "a") as f:
-        f.write(f'LinearRegression:\n')
-        f.write(f'- Train scores:\n')
-        for k, v in train_scores.items():
-            f.write(f'\t\t{k}: {v}\n')
-        f.write(f'- Test scores:\n')
-        for k, v in test_scores.items():
-            f.write(f'\t\t{k}: {v}\n')
+        with open(f_name, "a") as f:
+            f.write(f'LinearRegression:\n')
+            f.write(f'- Train scores:\n')
+            for k, v in train_scores.items():
+                f.write(f'\t\t{k}: {v}\n')
+            f.write(f'- Test scores:\n')
+            for k, v in test_scores.items():
+                f.write(f'\t\t{k}: {v}\n')
 
-    # Save the model
-    f_name = os.path.join(args.models_path, f'model_{model_name}.pkl')
+        # Save the model
+        f_name = os.path.join(models_path, f'model_{model_name}.pkl')
 
-    with open(f_name, 'wb') as f:
-        pickle.dump(clf, f)
+        with open(f_name, 'wb') as f:
+            pickle.dump(clf, f)
+
+    else:
+        f_name = os.path.join(models_path, f'model_{model_name}.pkl')
+        with open(f_name, 'rb') as f:
+            clf = pickle.load(f)
+
+        print('=> Evaluate fitted model on bootstrap samples of the test set')
+        MAEs = []
+        for _ in range(args.K):
+            indices = np.random.choice(X_test.shape[0], args.samples,
+                    replace=False)
+            test_preds = clf.predict(X_test[indices])
+            # Remaining LOS cannot be negative
+            test_preds = np.maximum(test_preds, 0) 
+
+            test_scores = evaluate_regression_model(y_test[indices], test_preds,
+                    verbose=False)
+            MAEs.append(test_scores['mae'])
+
+        mean_MAE = np.mean(MAEs)
+        std_MAE = np.std(MAEs)
+        print(f'Mean of MAE over {args.K} bootstrapping cycles of ' +
+                f'{args.samples} samples: {mean_MAE}')
+        print(f'Standard deviation of MAE over {args.K} bootstrapping cycles ' +
+                f'of {args.samples} samples: {std_MAE}')
 
 
 if __name__ == '__main__':
