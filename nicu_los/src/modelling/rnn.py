@@ -304,11 +304,18 @@ def main(args):
             if batch == test_steps:
                 break
 
-            y_pred.append(np.argmax(model.predict_on_batch(x), axis=1))
+            if task == "regression":
+                y_pred.append(model.predict_on_batch(x))
+            else:
+                y_pred.append(np.argmax(model.predict_on_batch(x), axis=1))
             y_true.append(y.numpy())
 
         y_pred = np.concatenate(y_pred).ravel()
         y_true = np.concatenate(y_true).ravel()
+
+        if task == "regression":
+            # Remaining LOS cannot be negative
+            t_pred = np.maximum(y_pred, 0)
 
         if task == 'classification':
             evaluate_classification_model(y_true, y_pred)
