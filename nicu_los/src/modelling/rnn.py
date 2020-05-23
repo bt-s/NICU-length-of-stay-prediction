@@ -55,6 +55,8 @@ def parse_cl_args():
             help='Training steps per training epoch.')
     parser.add_argument('--validation-steps', type=int, default=None,
             help='Validation steps per training epoch.')
+    parser.add_argument('--test-steps', type=int, default=None,
+            help='Test steps per training epoch.')
     parser.add_argument('--early-stopping', type=int, default=0,
             help=('Whether to use the early stopping callback. This number ' \
                     'indicates the patience, i.e. the number of epochs that ' \
@@ -207,13 +209,12 @@ def main(args):
 
     if training:
         train_list_file = os.path.join(data_path, 'train_list.txt')
-        val_list_file = os.path.join(data_path, 'val_list.txt')
-
         if not os.path.exists(train_list_file):
             with open(f'{data_path}/training_subjects.txt', 'r') as f:
                 train_dirs = f.read().splitlines()
                 create_list_file(train_dirs, train_list_file)
 
+        val_list_file = os.path.join(data_path, 'val_list.txt')
         if not os.path.exists(val_list_file):
             with open(f'{data_path}/validation_subjects.txt', 'r') as f:
                 val_dirs = f.read().splitlines()
@@ -221,10 +222,10 @@ def main(args):
 
         # Instantiate the training and validation readers
         train_reader = TimeSeriesReader(train_list_file,
-                coarse_targets=coarse_targets, mask=mask, name="Train reader")
+                coarse_targets=coarse_targets, mask=mask, name="train_reader")
         val_reader = TimeSeriesReader(val_list_file,
                 coarse_targets=coarse_targets, mask=mask,
-                name="Validation reader")
+                name="validation_reader")
 
         train_data_generator = data_generator(train_reader, training_steps,
                 batch_size, task)
@@ -281,35 +282,26 @@ def main(args):
             validation_steps=validation_steps, callbacks=callbacks)
 
     else:
+        test_steps = args.test_steps 
         test_list_file = os.path.join(data_path, 'test_list.txt')
-        batch_size = 16 
-        test_steps = 1000
-        shuffle = False
-
         if not os.path.exists(test_list_file):
             with open(f'{data_path}/test_subjects.txt', 'r') as f:
                 test_dirs = f.read().splitlines()
                 create_list_file(test_dirs, test_list_file)
 
         test_reader = TimeSeriesReader(test_list_file,
-                coarse_targets=coarse_targets, mask=mask, name="Test reader")
+                coarse_targets=coarse_targets, mask=mask, name="test_reader")
         test_data_generator = data_generator(test_reader, test_steps,
                 batch_size, task)
 
-        test_data = tf.data.Dataset.from_generator(test_data_generator,
+        test_data = tf.data.Dataset.from_generator(lambda: test_data_generator,
                 output_types=(tf.float32, tf.int16),
                 output_shapes=((batch_size, None, len(variables)),
                     (batch_size,)))
 
         y_true, y_pred = [], []
-
-        # Get the number of sequences by instantiating the test reader
-        test_reader = TimeSeriesReader(test_list_file, coarse_targets=coarse_targets,
-                mask=mask)
-        n_sequences = test_reader.get_number_of_sequences()
-        
-        for batch, (x, y) in enumerate(tqdm(test_data, total=n_sequences/batch_size)):
-            if batch == 1000:#> n_sequences/batch_size:
+        for batch, (x, y) in enumerate(tqdm(test_data, total=test_steps)):
+            if batch == test_steps:
                 break
 
             y_pred.append(np.argmax(model.predict_on_batch(x), axis=1))
