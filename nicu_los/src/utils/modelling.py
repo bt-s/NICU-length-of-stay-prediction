@@ -20,7 +20,7 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Activation, BatchNormalization, \
         Bidirectional, concatenate, Conv1D, Dense, Dropout, \
         GlobalAveragePooling1D, GRU, Input, Layer, LSTM, Masking, multiply, \
-        Reshape
+        Reshape, SpatialDropout1D
 from tensorflow.keras.losses import MeanAbsoluteError, SparseCategoricalCrossentropy
 from tensorflow.keras.optimizers import Adam
 
@@ -371,11 +371,12 @@ def construct_fcn(input_dimension, output_dimension, hid_dimension_lstm=8,
     return model
 
 
-def construct_lstm_fcn(input_dimension, output_dimension, dropout=0.8,
+def construct_lstm_fcn_original(input_dimension, output_dimension, dropout=0.8,
         hid_dimension_lstm=8, model_name=""):
     """Construct an LSTM-FCN model 
     
-    (Karim et al. 2019 - Multivariate LSTM-FCNs for time series classification)
+    Architecture as described in:
+        Karim et al. 2019 - Multivariate LSTM-FCNs for time series classification
 
     Args:
         input_dimension (int): Input dimension of the model
@@ -409,6 +410,66 @@ def construct_lstm_fcn(input_dimension, output_dimension, dropout=0.8,
     X2 = Conv1D(128, 3, padding='same', kernel_initializer='he_uniform')(X2)
     X2 = BatchNormalization()(X2)
     X2 = Activation('relu')(X2)
+
+    X2 = GlobalAveragePooling1D()(X2)
+
+    X = concatenate([X1, X2])
+
+    if output_dimension != 1:
+        # Classification
+        outputs = Dense(units=output_dimension, activation='softmax')(X)
+    else:
+        # Regression 
+        outputs = Dense(units=output_dimension)(X)
+
+    model = Model(inputs=inputs, outputs=outputs, name=model_name)
+
+    return model
+
+
+def construct_lstm_fcn(input_dimension, output_dimension, dropout=0.8,
+        hid_dimension_lstm=8, model_name=""):
+    """Construct a (modified) LSTM-FCN model 
+    
+    Modified architecture:
+       - Perform batch normalization after ReLU activation
+       - Use SpatialDropout1D in the convolutional blocks to reduce overfitting
+
+    Args:
+        input_dimension (int): Input dimension of the model
+        output_dimension (int): Output dimension of the model
+        dropout (float): Amount of dropout to apply
+        hid_dimension (int): Dimension of the hidden layer (i.e. # of unit in
+                             the RNN cell)
+        model_name (str): Name of the model
+
+    Returns:
+        model (tf.keras.Model): Constructed LSTM-FCN model
+    """
+
+    inputs = Input(shape=(None, input_dimension))
+
+    X1 = Masking()(inputs)
+    X1 = LSTM(hid_dimension_lstm)(X1)
+    X1 = Dropout(dropout)(X1)
+
+    X2 = Conv1D(128, 8, padding='same',
+            kernel_initializer='he_uniform')(inputs)
+    X2 = Activation('relu')(X2)
+    X2 = BatchNormalization()(X2)
+    X2 = SpatialDropout1D(0.5)(X2)
+    X2 = squeeze_excite_block(X2)
+
+    X2 = Conv1D(256, 5, padding='same', kernel_initializer='he_uniform')(X2)
+    X2 = Activation('relu')(X2)
+    X2 = BatchNormalization()(X2)
+    X2 = SpatialDropout1D(0.5)(X2)
+    X2 = squeeze_excite_block(X2)
+
+    X2 = Conv1D(128, 3, padding='same', kernel_initializer='he_uniform')(X2)
+    X2 = Activation('relu')(X2)
+    #X2 = Dropout(0.5)(X2)
+    X2 = BatchNormalization()(X2)
 
     X2 = GlobalAveragePooling1D()(X2)
 
