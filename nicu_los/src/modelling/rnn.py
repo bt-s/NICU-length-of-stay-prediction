@@ -19,7 +19,7 @@ from tqdm import tqdm
 
 import tensorflow as tf
 from tensorflow.keras.callbacks import CSVLogger, EarlyStopping, \
-        ModelCheckpoint, TensorBoard
+        LearningRateScheduler, ModelCheckpoint, TensorBoard
 
 from nicu_los.src.utils.modelling import construct_and_compile_model, \
         create_list_file, data_generator, MetricsCallback
@@ -261,6 +261,19 @@ def main(args):
             early_stopping_callback = EarlyStopping(monitor='val_loss',
                     min_delta=0, patience=early_stopping)
             callbacks.append(early_stopping_callback)
+
+        if task == "regression":
+            def lr_schedule(epoch):
+                if epoch < 3:
+                    lr = 0.01
+                elif epoch < 6:
+                    lr = 0.005
+                else:
+                    lr = 0.001
+                return lr
+            lr_scheduler = LearningRateScheduler(lr_schedule)
+            print("=> Create a learning rate scheduler")
+            callbacks.append(lr_scheduler)
 
         print(f'=> Fitting the model')
         model.fit(train_data, validation_data=val_data, epochs=args.epochs,
