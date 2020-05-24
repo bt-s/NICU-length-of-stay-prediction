@@ -58,7 +58,7 @@ def parse_cl_args():
     parser.add_argument('--training', dest='training', action='store_true')
     parser.add_argument('--testing', dest='training', action='store_false')
 
-    parser.add_argument('--K', type=int, default=20, help=('How often to ' +
+    parser.add_argument('--K', type=int, default=50, help=('How often to ' +
         'perform bootstrap sampling without replacement when evaluating ' +
         'the model'))
     parser.add_argument('--samples', type=int, default=16000, help=('Number ' +
