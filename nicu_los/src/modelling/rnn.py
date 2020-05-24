@@ -105,9 +105,12 @@ def parse_cl_args():
     parser.add_argument('--regression', dest='task', action='store_const',
             const='regression')
 
+    parser.add_argument('--lr-scheduler', dest='lr_scheduler', action='store_true',
+            help='Whether to use the learning rate scheduler.')
+
     parser.set_defaults(enable_gpu=False, training=True, coarse_targets=True,
             mask_indicator=True, metrics_callback=False, task='classification',
-            allow_growth=False, gestational_age=True)
+            allow_growth=False, gestational_age=True, lr_scheduler=False)
 
     return parser.parse_args(argv[1:])
 
@@ -263,7 +266,7 @@ def main(args):
                     min_delta=0, patience=early_stopping)
             callbacks.append(early_stopping_callback)
 
-        if task == "regression":
+        if args.lr_scheduler:
             def lr_schedule(epoch):
                 if epoch < 3:
                     lr = 0.01
