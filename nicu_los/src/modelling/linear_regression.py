@@ -59,7 +59,12 @@ def main(args):
 
     if not os.path.exists(models_path):
         os.makedirs(models_path)
-    print(f'=> Training {model_name}.')
+    
+    if args.training:
+        print(f'=> Training {model_name}.')
+    else:
+        print(f'=> Evaluating {model_name}.')
+
     print(f'=> Pre-imputed features: {pre_imputed}')
 
     with open(f'{data_path}/training_subjects.txt', 'r') as f:

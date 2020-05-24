@@ -83,6 +83,11 @@ def main(args):
     regularizer = args.regularizer
     C = args.C
 
+    if args.training:
+        print(f'=> Training {model_name}')
+    else:
+        print(f'=> Evaluating {model_name}')
+
     with open(f'{data_path}/training_subjects.txt', 'r') as f:
         train_dirs = f.read().splitlines()
     with open(f'{data_path}/validation_subjects.txt', 'r') as f:
