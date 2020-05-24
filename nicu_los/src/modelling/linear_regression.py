@@ -40,7 +40,7 @@ def parse_cl_args():
     parser.add_argument('--training', dest='training', action='store_true')
     parser.add_argument('--testing', dest='training', action='store_false')
 
-    parser.add_argument('--K', type=int, default=20, help=('How often to ' +
+    parser.add_argument('--K', type=int, default=25, help=('How often to ' +
         'perform bootstrap sampling without replacement when evaluating ' +
         'the model'))
     parser.add_argument('--samples', type=int, default=16000, help=('Number ' +
@@ -139,15 +139,23 @@ def main(args):
         with open(f_name, 'wb') as f:
             pickle.dump(clf, f)
 
-    else:
+    else: # evaluation
+        K = args.K
+        samples = args.samples
+
         f_name = os.path.join(models_path, f'model_{model_name}.pkl')
         with open(f_name, 'rb') as f:
             clf = pickle.load(f)
 
+        results_dir = os.path.join(models_path, 'results', model_name)
+        if not os.path.exists(results_dir):
+            os.makedirs(results_dir)
+        f_name_results = os.path.join(results_dir, f'results.txt')
+
         print('=> Evaluate fitted model on bootstrap samples of the test set')
         MAEs = []
-        for _ in range(args.K):
-            indices = np.random.choice(X_test.shape[0], args.samples,
+        for _ in range(K):
+            indices = np.random.choice(X_test.shape[0], samples,
                     replace=False)
             test_preds = clf.predict(X_test[indices])
             # Remaining LOS cannot be negative
@@ -159,10 +167,12 @@ def main(args):
 
         mean_MAE = np.mean(MAEs)
         std_MAE = np.std(MAEs)
-        print(f'Mean of MAE over {args.K} bootstrapping cycles of ' +
-                f'{args.samples} samples: {mean_MAE}')
-        print(f'Standard deviation of MAE over {args.K} bootstrapping cycles ' +
-                f'of {args.samples} samples: {std_MAE}')
+        print(f"Mean Absolute Error:\n\tmean {mean_MAE}\n\tstd-dev {std_MAE}")
+
+        with open(f_name_results, "a") as f:
+            f.write(f'- Test scores K={K}, samples={samples}:\n')
+            f.write(f"\tMAE mean: {mean_kappa}\n")
+            f.write(f"\tMAE std-dev: {std_kappa}\n")
 
 
 if __name__ == '__main__':
