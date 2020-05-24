@@ -54,8 +54,17 @@ def parse_cl_args():
     parser.add_argument('--C', type=float, default=1.0, help=('The Logistic ' \
             'Regression C parameter (i.e. float between 0.0 and 1.0).'))
 
+    parser.add_argument('--training', dest='training', action='store_true')
+    parser.add_argument('--testing', dest='training', action='store_false')
+
+    parser.add_argument('--K', type=int, default=20, help=('How often to ' +
+        'perform bootstrap sampling without replacement when evaluating ' +
+        'the model'))
+    parser.add_argument('--samples', type=int, default=16000, help=('Number ' +
+    'of test samples per bootstrap'))
+
     parser.set_defaults(pre_imputed=False, grid_search=False,
-            coarse_targets=True)
+            coarse_targets=True, training=True)
 
     return parser.parse_args(argv[1:])
 
@@ -71,11 +80,6 @@ def main(args):
     pre_imputed = args.pre_imputed
     regularizer = args.regularizer
     C = args.C
-
-    print(f'=> Training {model_name}')
-    print(f'=> Pre-imputed features: {pre_imputed}')
-    print(f'=> Coarse targets: {coarse_targets}')
-    print(f'=> Grid search: {grid_search}')
 
     with open(f'{data_path}/training_subjects.txt', 'r') as f:
         train_dirs = f.read().splitlines()
@@ -105,84 +109,116 @@ def main(args):
     X_val = scaler.transform(X_val)
     X_test = scaler.transform(X_test)
 
-    # The training and validation set need to be fed conjointly to GridSearchCV
-    X = np.vstack((X_train, X_val))
-    y = np.hstack((y_train, y_val))
+    if args.training:
+        print(f'=> Training {model_name}')
+        print(f'=> Pre-imputed features: {pre_imputed}')
+        print(f'=> Coarse targets: {coarse_targets}')
+        print(f'=> Grid search: {grid_search}')
 
-    # Define what indices of X belong to x_train, and which to x_Val
-    val_idx = np.hstack((np.ones(X_train.shape[0])*-1, np.ones(X_val.shape[0])))
-    ps = PredefinedSplit(test_fold=val_idx)
+        # The training and validation set need to be fed conjointly to GridSearchCV
+        X = np.vstack((X_train, X_val))
+        y = np.hstack((y_train, y_val))
 
-    # Define the parameter grid
-    if grid_search:
-        # Initialize the logistic regression hyper-paramters
-        LR = LogisticRegression(random_state=42, multi_class="multinomial",
-                solver='saga')
+        # Define what indices of X belong to x_train, and which to x_Val
+        val_idx = np.hstack((np.ones(X_train.shape[0])*-1, np.ones(X_val.shape[0])))
+        ps = PredefinedSplit(test_fold=val_idx)
 
-        regularizers = ['l1', 'l2']
-        Cs = [1.0, 0.1, 0.01, 0.001, 0.0001, 0.00001 ]
-        print(f'=> Doing a grid search with the following regularizers and Cs.')
-        print(f'=> Regularizers: {regularizers} .')
-        print(f'=> Cs: {Cs} .')
+        # Define the parameter grid
+        if grid_search:
+            # Initialize the logistic regression hyper-paramters
+            LR = LogisticRegression(random_state=42, multi_class="multinomial",
+                    solver='saga')
 
-        param_grid = dict(C=Cs, penalty=regularizers)
+            regularizers = ['l1', 'l2']
+            Cs = [1.0, 0.1, 0.01, 0.001, 0.0001, 0.00001 ]
+            print(f'=> Doing a grid search with the following regularizers and Cs.')
+            print(f'=> Regularizers: {regularizers} .')
+            print(f'=> Cs: {Cs} .')
 
-        # Initialize the grid serach using the predefined train-validation split
-        clf = GridSearchCV(LR, param_grid=param_grid, n_jobs=8, cv=ps,
-                scoring=make_scorer(cohen_kappa_score), verbose=3)
+            param_grid = dict(C=Cs, penalty=regularizers)
 
-        # Fit the GridSearchCV to find the optimal estimator
-        print(f'=> Fitting the Logistic Regression model')
-        clf.fit(X, y)
+            # Initialize the grid serach using the predefined train-validation split
+            clf = GridSearchCV(LR, param_grid=param_grid, n_jobs=8, cv=ps,
+                    scoring=make_scorer(cohen_kappa_score), verbose=3)
 
-        # Extract the best estimator and fit again on all available training data
-        print(f'=> Fitting the best Logistic Regression model on all available data')
-        clf = clf.best_estimator_
-        clf.fit(X, y)
+            # Fit the GridSearchCV to find the optimal estimator
+            print(f'=> Fitting the Logistic Regression model')
+            clf.fit(X, y)
+
+            # Extract the best estimator and fit again on all available training data
+            print(f'=> Fitting the best Logistic Regression model on all available data')
+            clf = clf.best_estimator_
+            clf.fit(X, y)
+        else:
+            # Initialize the logistic regression estimator
+            clf = LogisticRegression(random_state=42, penalty=regularizer, C=C,
+                    multi_class="multinomial", solver='saga')
+
+            print(f'=> Fitting Logistic Regression model with ' \
+                    'regularizer={regularizer} and C={C}')
+            clf.fit(X, y)
+
+        # Predict on the training set
+        train_preds = clf.predict_proba(X)
+        train_act = np.argmax(train_preds, axis=1)
+
+        # Predict on the testing set
+        test_preds = clf.predict_proba(X_test)
+        test_act = np.argmax(test_preds, axis=1)
+
+        print('=> Evaluate fitted model on the training set')
+        train_scores = evaluate_classification_model(y, train_act)
+
+        print('=> Evaluate fitted model on the test set')
+        test_scores = evaluate_classification_model(y_test, test_act)
+
+        if model_name:
+            print('=> Saving the model')
+            f_name = os.path.join(args.models_path, f'results_{model_name}.txt')
+
+            with open(f_name, "a") as f:
+                if grid_search:
+                    f.write(f'Best LR model: {clf.best_estimator_}:\n')
+                else:
+                    f.write(f'Best LR model: {clf.get_params}:\n')
+
+                f.write(f'- Training scores:\n')
+                for k, v in train_scores.items():
+                    f.write(f'\t\t{k}: {v}\n')
+                f.write(f'- Test scores:\n')
+                for k, v in test_scores.items():
+                    f.write(f'\t\t{k}: {v}\n')
+
+            f_name = os.path.join(args.models_path, f'best_model_{model_name}.pkl')
+
+            with open(f_name, 'wb') as f:
+                pickle.dump(clf, f)
+
     else:
-        # Initialize the logistic regression estimator
-        clf = LogisticRegression(random_state=42, penalty=regularizer, C=C,
-                multi_class="multinomial", solver='saga')
-
-        print(f'=> Fitting Logistic Regression model with ' \
-                'regularizer={regularizer} and C={C}')
-        clf.fit(X, y)
-
-    # Predict on the training set
-    train_preds = clf.predict_proba(X)
-    train_act = np.argmax(train_preds, axis=1)
-
-    # Predict on the testing set
-    test_preds = clf.predict_proba(X_test)
-    test_act = np.argmax(test_preds, axis=1)
-
-    print('=> Evaluate fitted model on the training set')
-    train_scores = evaluate_classification_model(y, train_act)
-
-    print('=> Evaluate fitted model on the test set')
-    test_scores = evaluate_classification_model(y_test, test_act)
-
-    if model_name:
-        print('=> Saving the model')
-        f_name = os.path.join(args.models_path, f'results_{model_name}.txt')
-
-        with open(f_name, "a") as f:
-            if grid_search:
-                f.write(f'Best LR model: {clf.best_estimator_}:\n')
-            else:
-                f.write(f'Best LR model: {clf.get_params}:\n')
-
-            f.write(f'- Training scores:\n')
-            for k, v in train_scores.items():
-                f.write(f'\t\t{k}: {v}\n')
-            f.write(f'- Test scores:\n')
-            for k, v in test_scores.items():
-                f.write(f'\t\t{k}: {v}\n')
-
         f_name = os.path.join(args.models_path, f'best_model_{model_name}.pkl')
 
-        with open(f_name, 'wb') as f:
-            pickle.dump(clf, f)
+        with open(f_name, 'rb') as f:
+            clf = pickle.load(f)
+
+        print('=> Evaluate fitted model on bootstrap samples of the test set')
+        kappas = []
+        for _ in range(args.K):
+            indices = np.random.choice(X_test.shape[0], args.samples, replace=False)
+
+            test_preds = clf.predict_proba(X_test[indices])
+            test_preds = np.argmax(test_preds, axis=1)
+        
+            test_scores = evaluate_classification_model(y_test[indices],
+                    test_preds, verbose=False)
+
+            kappas.append(test_scores['kappa'])
+
+        mean_kappa = np.mean(kappas)
+        std_kappa = np.std(kappas)
+        print(f"Mean of Cohen's kappa over {args.K} bootstrapping cycles of " +
+                f'{args.samples} samples: {mean_kappa}')
+        print(f"Standard deviation of Cohen's kappa over {args.K} " +
+                f'bootstrapping cycles of {args.samples} samples: {std_kappa}')
 
 
 if __name__ == '__main__':
