@@ -20,7 +20,8 @@ from sklearn.model_selection import GridSearchCV, PredefinedSplit
 from sklearn.metrics import make_scorer, cohen_kappa_score
 
 from nicu_los.src.utils.modelling import get_baseline_datasets
-from nicu_los.src.utils.evaluation import evaluate_classification_model
+from nicu_los.src.utils.evaluation import calculate_cohen_kappa, \
+        evaluate_classification_model
 
 
 def parse_cl_args():
@@ -70,8 +71,9 @@ def parse_cl_args():
 
 
 def main(args):
-    if not os.path.exists(args.models_path):
-        os.makedirs(args.models_path)
+    models_path = args.models_path
+    if not os.path.exists(models_path):
+        os.makedirs(models_path)
 
     coarse_targets = args.coarse_targets
     data_path = args.subjects_path
@@ -174,7 +176,7 @@ def main(args):
 
         if model_name:
             print('=> Saving the model')
-            f_name = os.path.join(args.models_path, f'results_{model_name}.txt')
+            f_name = os.path.join(models_path, f'results_{model_name}.txt')
 
             with open(f_name, "a") as f:
                 if grid_search:
@@ -189,37 +191,46 @@ def main(args):
                 for k, v in test_scores.items():
                     f.write(f'\t\t{k}: {v}\n')
 
-            f_name = os.path.join(args.models_path, f'best_model_{model_name}.pkl')
+            f_name = os.path.join(models_path, f'best_model_{model_name}.pkl')
 
             with open(f_name, 'wb') as f:
                 pickle.dump(clf, f)
 
-    else:
-        f_name = os.path.join(args.models_path, f'best_model_{model_name}.pkl')
+    else: # evaluation
+        K = args.K
+        samples = args.samples
 
+        f_name = os.path.join(models_path, f'best_model_{model_name}.pkl')
         with open(f_name, 'rb') as f:
             clf = pickle.load(f)
 
-        print('=> Evaluate fitted model on bootstrap samples of the test set')
+        results_dir = os.path.join(models_path, 'results', model_name)
+        if not os.path.exists(results_dir):
+            os.makedirs(results_dir)
+        f_name_results = os.path.join(results_dir, f'results.txt')
+
+        print(f'=> Bootrapping evaluation (K={K}, samples={samples})')
         kappas = []
-        for _ in range(args.K):
-            indices = np.random.choice(X_test.shape[0], args.samples, replace=False)
+        for _ in range(K):
+            indices = np.random.choice(X_test.shape[0], samples, replace=False)
 
             test_preds = clf.predict_proba(X_test[indices])
             test_preds = np.argmax(test_preds, axis=1)
         
-            test_scores = evaluate_classification_model(y_test[indices],
-                    test_preds, verbose=False)
+            kappa = calculate_cohen_kappa(y_test[indices], test_preds,
+                    verbose=False)
 
-            kappas.append(test_scores['kappa'])
+            kappas.append(kappa)
 
         mean_kappa = np.mean(kappas)
         std_kappa = np.std(kappas)
-        print(f"Mean of Cohen's kappa over {args.K} bootstrapping cycles of " +
-                f'{args.samples} samples: {mean_kappa}')
-        print(f"Standard deviation of Cohen's kappa over {args.K} " +
-                f'bootstrapping cycles of {args.samples} samples: {std_kappa}')
+        print(f"Cohen's kappa:\n\tmean {mean_kappa}\n\tstd-dev {std_kappa}")
 
+        with open(f_name_results, "a") as f:
+            f.write(f'- Test scores K={K}, samples={samples}:\n')
+            f.write(f"\tCohen's kappa mean: {mean_kappa}\n")
+            f.write(f"\tCohen's kappa std-dev: {std_kappa}\n")
+        
 
 if __name__ == '__main__':
     main(parse_cl_args())

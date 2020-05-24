@@ -39,6 +39,14 @@ def evaluate_classification_model(y_true, y_pred, verbose=1):
             'recall': recall, 'cm': cm}
 
 
+def calculate_cohen_kappa(y_true, y_pred, verbose=1):
+    kappa = cohen_kappa_score(y_true, y_pred, weights='linear')
+    if verbose:
+        print(f'=> Linear Cohen Kappa Score: {kappa}')
+
+    return kappa
+
+
 def evaluate_regression_model(y_true, y_pred, verbose=1):
     mae = mean_absolute_error(y_true, y_pred)
     mse = mean_squared_error(y_true, y_pred)
@@ -52,6 +60,14 @@ def evaluate_regression_model(y_true, y_pred, verbose=1):
         print(f'=> Mean Aboslute Perentage Error (MAPE): {mape}')
 
     return {'mae': mae, 'mse': mse, 'rmse': rmse, 'mape': mape}
+
+
+def calculate_mean_absolute_error(y_true, y_pred, verbose=1):
+    mae = mean_absolute_error(y_true, y_pred)
+    if verbose:
+        print(f'=> Mean Absolute Error (MAE): {mae}')
+
+    return mae
 
 
 def get_confusion_matrix(model, X, y, save_plot='', class_names=['0-1',

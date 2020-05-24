@@ -23,8 +23,8 @@ from tensorflow.keras.callbacks import CSVLogger, EarlyStopping, \
 
 from nicu_los.src.utils.modelling import construct_and_compile_model, \
         create_list_file, data_generator, MetricsCallback
-from nicu_los.src.utils.evaluation import evaluate_classification_model, \
-        evaluate_regression_model
+from nicu_los.src.utils.evaluation import calculate_cohen_kappa, \
+        calculate_mean_absolute_error
         
 from nicu_los.src.utils.readers import TimeSeriesReader
 
@@ -55,8 +55,6 @@ def parse_cl_args():
             help='Training steps per training epoch.')
     parser.add_argument('--validation-steps', type=int, default=None,
             help='Validation steps per training epoch.')
-    parser.add_argument('--test-steps', type=int, default=None,
-            help='Test steps per training epoch.')
     parser.add_argument('--early-stopping', type=int, default=0,
             help=('Whether to use the early stopping callback. This number ' \
                     'indicates the patience, i.e. the number of epochs that ' \
@@ -107,6 +105,12 @@ def parse_cl_args():
 
     parser.add_argument('--lr-scheduler', dest='lr_scheduler', action='store_true',
             help='Whether to use the learning rate scheduler.')
+
+    parser.add_argument('--K', type=int, default=20, help=('How often to ' +
+        'perform bootstrap sampling without replacement when evaluating ' +
+        'the model'))
+    parser.add_argument('--samples', type=int, default=16000, help=('Number ' +
+    'of test samples per bootstrap'))
 
     parser.set_defaults(enable_gpu=False, training=True, coarse_targets=True,
             mask_indicator=True, metrics_callback=False, task='classification',
@@ -284,8 +288,18 @@ def main(args):
             initial_epoch=args.initial_epoch, steps_per_epoch=training_steps,
             validation_steps=validation_steps, callbacks=callbacks)
 
-    else:
-        test_steps = args.test_steps 
+    else: # evaluation
+        K = args.K
+        samples = args.samples
+        print(f'=> Bootrapping evaluation (K={K}, samples={samples})')
+        test_steps = samples // batch_size
+
+        results_dir = os.path.join(model_path, 'results', \
+                f'batch{batch_size}-test_steps{test_steps}-K{K}-' + checkpoint_file)
+        if not os.path.exists(results_dir):
+            os.makedirs(results_dir)
+        f_name_results = os.path.join(results_dir, f'results.txt')
+
         test_list_file = os.path.join(data_path, 'test_list.txt')
         if not os.path.exists(test_list_file):
             with open(f'{data_path}/test_subjects.txt', 'r') as f:
@@ -302,28 +316,61 @@ def main(args):
                 output_shapes=((batch_size, None, len(variables)),
                     (batch_size,)))
 
-        y_true, y_pred = [], []
-        for batch, (x, y) in enumerate(tqdm(test_data, total=test_steps)):
-            if batch == test_steps:
-                break
-
-            if task == "regression":
-                y_pred.append(model.predict_on_batch(x))
-            else:
-                y_pred.append(np.argmax(model.predict_on_batch(x), axis=1))
-            y_true.append(y.numpy())
-
-        y_pred = np.concatenate(y_pred).ravel()
-        y_true = np.concatenate(y_true).ravel()
-
         if task == "regression":
-            # Remaining LOS cannot be negative
-            t_pred = np.maximum(y_pred, 0)
+            MAEs = []
+            for _ in range(K):
+                y_true, y_pred = [], []
+                for batch, (x, y) in enumerate(test_data):
+                    if batch == test_steps:
+                        break
 
-        if task == 'classification':
-            evaluate_classification_model(y_true, y_pred)
-        else:
-            evaluate_regression_model(y_true, y_pred)
+                    y_true.append(y.numpy())
+                    y_pred.append(model.predict_on_batch(x))
+
+                y_pred = np.concatenate(y_pred).ravel()
+                y_pred = np.maximum(y_pred, 0) # remaining LOS can't be negative
+                y_true = np.concatenate(y_true).ravel()
+
+                mae = calculate_mean_absolute_error(y_true, y_pred,
+                        verbose=False)
+                MAEs.append(mae)
+
+            mean_MAE = np.mean(MAEs)
+            std_MAE = np.std(MAEs)
+            print(f"MAE:\n\tmean {mean_MAE}\n\tstd-dev {std_MAE}")
+
+            print(f'=> Writing results to {f_name_results}')
+            with open(f_name_results, "a") as f:
+                f.write(f'- Test scores K={K}, samples={samples}:\n')
+                f.write(f'\tMAE mean: {mean_MAE}\n')
+                f.write(f'\tMAE std-dev: {std_MAE}\n')
+
+        if task == "classification":
+            kappas = []
+            for _ in range(K):
+                y_true, y_pred = [], []
+                for batch, (x, y) in enumerate(test_data):
+                    if batch == test_steps:
+                        break
+
+                    y_true.append(y.numpy())
+                    y_pred.append(np.argmax(model.predict_on_batch(x), axis=1))
+
+                y_pred = np.concatenate(y_pred).ravel()
+                y_true = np.concatenate(y_true).ravel()
+
+                kappa = calculate_cohen_kappa(y_true, y_pred, verbose=False)
+                kappas.append(kappa)
+
+            mean_kappa = np.mean(kappas)
+            std_kappa = np.std(kappas)
+            print(f"Cohen's kappa:\n\tmean {mean_kappa}\n\tstd-dev {std_kappa}")
+
+            print(f'=> Writing results to {f_name_results}')
+            with open(f_name_results, "a") as f:
+                f.write(f'- Test scores K={K}, samples={samples}:\n')
+                f.write(f"\tCohen's kappa mean: {mean_kappa}\n")
+                f.write(f"\tCohen's kappa std-dev: {std_kappa}\n")
 
 
 if __name__ == '__main__':
