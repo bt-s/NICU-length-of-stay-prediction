@@ -178,11 +178,12 @@ class TimeSeriesReader(object):
         config (str): Path to the nicu_los config file
         ts_file (str): Name of the files containing the timeseries
         coarse_targets (bool): Whether to use coarse targets
+        gestational_age (bool): Whether to use the gestational age variable 
         mask (bool): Whether to use missingness indicator variables
     """
     def __init__(self, list_file, config='nicu_los/config.json',
             ts_file='timeseries_normalized.csv', coarse_targets=False,
-            mask=True, name=""):
+            gestational_age=True, mask=True, name=""):
         self.current_index = 0
         self.ts_file = ts_file
         self.coarse_targets = coarse_targets
@@ -198,6 +199,10 @@ class TimeSeriesReader(object):
         with open(config) as f:
             config = json.load(f)
             self.variables = config['variables']
+
+            if not gestational_age and "GESTATIONAL_AGE_DAYS" in self.variables:
+                self.variables.remove("GESTATIONAL_AGE_DAYS")
+
             if mask:
                 self.variables = self.variables + \
                         ['mask_' + v for v in self.variables]

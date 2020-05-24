@@ -229,10 +229,11 @@ def main(args):
 
         # Instantiate the training and validation readers
         train_reader = TimeSeriesReader(train_list_file,
-                coarse_targets=coarse_targets, mask=mask, name="train_reader")
+                coarse_targets=coarse_targets, mask=mask, 
+                gestational_age=gestational_age, name="train_reader")
         val_reader = TimeSeriesReader(val_list_file,
                 coarse_targets=coarse_targets, mask=mask,
-                name="validation_reader")
+                gestational_age=gestational_age, name="validation_reader")
 
         train_data_generator = data_generator(train_reader, training_steps,
                 batch_size, task)
@@ -307,7 +308,8 @@ def main(args):
                 create_list_file(test_dirs, test_list_file)
 
         test_reader = TimeSeriesReader(test_list_file,
-                coarse_targets=coarse_targets, mask=mask, name="test_reader")
+                coarse_targets=coarse_targets, mask=mask,
+                gestational_age=gestational_age, name="test_reader")
         test_data_generator = data_generator(test_reader, test_steps,
                 batch_size, task)
 
