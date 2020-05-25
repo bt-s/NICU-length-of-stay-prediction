@@ -104,12 +104,12 @@ def data_generator(reader, steps, batch_size, task, shuffle=True):
     chunk_size = min(1024, steps) * batch_size
 
     while True:
-        # Only shuffle when the current reader index is 0, or if we are close
-        # to the end of the reader -- then we reset the index
-        if shuffle and (reader.current_index == 0 or reader.current_index >
-                (n_examples - chunk_size)):
-            reader.random_shuffle()
-            reader.current_index = 0 
+        # Shuffle once per epoch
+        if shuffle:
+            if (reader.current_index == 0) or (reader.current_index >
+                batch_size*steps):
+                reader.random_shuffle()
+                reader.current_index = 0 
 
         n_examples_remaining = n_examples_epoch
         while n_examples_remaining > 0:
