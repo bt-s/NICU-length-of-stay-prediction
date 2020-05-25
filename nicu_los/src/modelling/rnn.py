@@ -106,7 +106,7 @@ def parse_cl_args():
     parser.add_argument('--lr-scheduler', dest='lr_scheduler', action='store_true',
             help='Whether to use the learning rate scheduler.')
 
-    parser.add_argument('--K', type=int, default=20, help=('How often to ' +
+    parser.add_argument('--K', type=int, default=50, help=('How often to ' +
         'perform bootstrap sampling without replacement when evaluating ' +
         'the model'))
     parser.add_argument('--samples', type=int, default=16000, help=('Number ' +
@@ -320,7 +320,9 @@ def main(args):
 
         if task == "regression":
             MAEs = []
-            for _ in range(K):
+            for k in range(K):
+                if (k % 5) == 0:
+                    print(f'Iteration {k}/{K}')
                 y_true, y_pred = [], []
                 for batch, (x, y) in enumerate(test_data):
                     if batch == test_steps:
@@ -349,7 +351,9 @@ def main(args):
 
         if task == "classification":
             kappas = []
-            for _ in range(K):
+            for k in range(K):
+                if (k % 5) == 0:
+                    print(f'Iteration {k}/{K}')
                 y_true, y_pred = [], []
                 for batch, (x, y) in enumerate(test_data):
                     if batch == test_steps:
