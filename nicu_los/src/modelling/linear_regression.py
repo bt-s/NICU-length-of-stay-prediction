@@ -171,8 +171,13 @@ def main(args):
 
         with open(f_name_results, "a") as f:
             f.write(f'- Test scores K={K}, samples={samples}:\n')
+<<<<<<< HEAD
             f.write(f"\tMAE mean: {mean_MAE}\n")
             f.write(f"\tMAE std-dev: {std_MAE}\n")
+=======
+            f.write(f"\tMAE mean: {mean_kappa}\n")
+            f.write(f"\tMAE std-dev: {std_kappa}\n")
+>>>>>>> a082d8a1cc665e6139b1001986948a2fba3db9c6
 
 
 if __name__ == '__main__':
