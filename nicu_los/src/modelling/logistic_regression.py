@@ -20,7 +20,7 @@ from sklearn.model_selection import GridSearchCV, PredefinedSplit
 from sklearn.metrics import make_scorer, cohen_kappa_score
 
 from nicu_los.src.utils.modelling import get_baseline_datasets
-from nicu_los.src.utils.evaluation import calculate_cohen_kappa, \
+from nicu_los.src.utils.evaluation import calculate_metric, \
         evaluate_classification_model
 
 
@@ -215,26 +215,39 @@ def main(args):
         f_name_results = os.path.join(results_dir, f'results.txt')
 
         print(f'=> Bootrapping evaluation (K={K}, samples={samples})')
-        kappas = []
+        accs, kappas, recalls, precisions, f1s = [], [], [], [], []
         for _ in range(K):
             indices = np.random.choice(X_test.shape[0], samples, replace=False)
 
             test_preds = clf.predict_proba(X_test[indices])
             test_preds = np.argmax(test_preds, axis=1)
+            test_true = y_test[indices]
+
+            accs.append(calculate_metric(test_true, test_preds, metric='accuracy',
+                verbose=False))
+            kappas.append(calculate_metric(test_true, test_preds, metric='kappa',
+                verbose=False))
+            recalls.append(calculate_metric(test_true, test_preds, metric='recall',
+                verbose=False))
+            precisions.append(calculate_metric(test_true, test_preds,
+                metric='precision', verbose=False))
+            f1s.append(calculate_metric(test_true, test_preds, metric='f1',
+                verbose=False))
         
-            kappa = calculate_cohen_kappa(y_test[indices], test_preds,
-                    verbose=False)
-
-            kappas.append(kappa)
-
-        mean_kappa = np.mean(kappas)
-        std_kappa = np.std(kappas)
-        print(f"Cohen's kappa:\n\tmean {mean_kappa}\n\tstd-dev {std_kappa}")
+        print(f"Cohen's kappa:\n\tmean {np.mean(kappas)}\n\tstd-dev {np.std(kappas)}")
 
         with open(f_name_results, "a") as f:
             f.write(f'- Test scores K={K}, samples={samples}:\n')
-            f.write(f"\tCohen's kappa mean: {mean_kappa}\n")
-            f.write(f"\tCohen's kappa std-dev: {std_kappa}\n")
+            f.write(f"\tAccuracy mean: {np.mean(accs)}\n")
+            f.write(f"\tAccuracy std-dev: {np.std(accs)}\n")
+            f.write(f"\tCohen's kappa mean: {np.mean(kappas)}\n")
+            f.write(f"\tCohen's kappa std-dev: {np.std(kappas)}\n")
+            f.write(f"\tRecall mean: {np.mean(recalls)}\n")
+            f.write(f"\tRecall std-dev: {np.std(recalls)}\n")
+            f.write(f"\tPrecision mean: {np.mean(precisions)}\n")
+            f.write(f"\tPrecision std-dev: {np.std(precisions)}\n")
+            f.write(f"\tF1 mean: {np.mean(f1s)}\n")
+            f.write(f"\tF1 std-dev: {np.std(f1s)}\n")
         
 
 if __name__ == '__main__':

@@ -23,7 +23,7 @@ from tensorflow.keras.callbacks import CSVLogger, EarlyStopping, \
 
 from nicu_los.src.utils.modelling import construct_and_compile_model, \
         create_list_file, data_generator, MetricsCallback
-from nicu_los.src.utils.evaluation import calculate_cohen_kappa, \
+from nicu_los.src.utils.evaluation import calculate_metric, \
         calculate_mean_absolute_error
         
 from nicu_los.src.utils.readers import TimeSeriesReader
@@ -280,6 +280,7 @@ def main(args):
                 else:
                     lr = 0.001
                 return lr
+
             lr_scheduler = LearningRateScheduler(lr_schedule)
             print("=> Create a learning rate scheduler")
             callbacks.append(lr_scheduler)
@@ -292,14 +293,14 @@ def main(args):
     else: # evaluation
         K = args.K
         samples = args.samples
-        print(f'=> Bootrapping evaluation (K={K}, samples={samples})')
+        print(f'=> Bootstrapping evaluation (K={K}, samples={samples})')
         test_steps = samples // batch_size
 
         results_dir = os.path.join(model_path, 'results', \
                 f'batch{batch_size}-test_steps{test_steps}-K{K}-' + checkpoint_file)
         if not os.path.exists(results_dir):
             os.makedirs(results_dir)
-        f_name_results = os.path.join(results_dir, f'results.txt')
+        f_name_results = os.path.join(results_dir, f'results_new.txt')
 
         test_list_file = os.path.join(data_path, 'test_list.txt')
         if not os.path.exists(test_list_file):
@@ -350,7 +351,7 @@ def main(args):
                 f.write(f'\tMAE std-dev: {std_MAE}\n')
 
         if task == "classification":
-            kappas = []
+            accs, kappas, recalls, precisions, f1s = [], [], [], [], []
             for k in range(K):
                 if (k % 5) == 0:
                     print(f'Iteration {k}/{K}')
@@ -365,18 +366,33 @@ def main(args):
                 y_pred = np.concatenate(y_pred).ravel()
                 y_true = np.concatenate(y_true).ravel()
 
-                kappa = calculate_cohen_kappa(y_true, y_pred, verbose=False)
-                kappas.append(kappa)
+                accs.append(calculate_metric(y_true, y_pred, metric='accuracy',
+                    verbose=False))
+                kappas.append(calculate_metric(y_true, y_pred, metric='kappa',
+                    verbose=False))
+                recalls.append(calculate_metric(y_true, y_pred, metric='recall',
+                    verbose=False))
+                precisions.append(calculate_metric(y_true, y_pred,
+                    metric='precision', verbose=False))
+                f1s.append(calculate_metric(y_true, y_pred, metric='f1',
+                    verbose=False))
 
-            mean_kappa = np.mean(kappas)
-            std_kappa = np.std(kappas)
-            print(f"Cohen's kappa:\n\tmean {mean_kappa}\n\tstd-dev {std_kappa}")
+            print(f"Cohen's kappa:\n\tmean {np.mean(kappas)}\n\tstd-dev " +
+                    f"{np.std(kappas)}")
 
             print(f'=> Writing results to {f_name_results}')
             with open(f_name_results, "a") as f:
                 f.write(f'- Test scores K={K}, samples={samples}:\n')
-                f.write(f"\tCohen's kappa mean: {mean_kappa}\n")
-                f.write(f"\tCohen's kappa std-dev: {std_kappa}\n")
+                f.write(f"\tAccuracy mean: {np.mean(accs)}\n")
+                f.write(f"\tAccuracy std-dev: {np.std(accs)}\n")
+                f.write(f"\tCohen's kappa mean: {np.mean(kappas)}\n")
+                f.write(f"\tCohen's kappa std-dev: {np.std(kappas)}\n")
+                f.write(f"\tRecall mean: {np.mean(recalls)}\n")
+                f.write(f"\tRecall std-dev: {np.std(recalls)}\n")
+                f.write(f"\tPrecision mean: {np.mean(precisions)}\n")
+                f.write(f"\tPrecision std-dev: {np.std(precisions)}\n")
+                f.write(f"\tF1 mean: {np.mean(f1s)}\n")
+                f.write(f"\tF1 std-dev: {np.std(f1s)}\n")
 
 
 if __name__ == '__main__':
