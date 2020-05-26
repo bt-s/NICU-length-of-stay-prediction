@@ -146,3 +146,4 @@ conda-env/
 *.swl
 /cnn-test
 mycert.pem
+/scripts/test_scripts/
