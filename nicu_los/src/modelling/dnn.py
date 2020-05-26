@@ -1,8 +1,8 @@
 #!/usr/bin/python3
 
-"""rnn.py
+"""dnn.py
 
-Script to run various types of Recurrent Neural Networks (RNNs) to predict the
+Script to run various types of Deep Neural Networks (DNNs) to predict the
 remaining length-of-stay.
 """
 
