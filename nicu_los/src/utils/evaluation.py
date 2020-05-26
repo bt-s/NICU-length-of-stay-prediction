@@ -16,11 +16,54 @@ from sklearn.metrics import accuracy_score, cohen_kappa_score, \
         plot_confusion_matrix, precision_score, recall_score, roc_auc_score
 
 
-def mean_absolute_perc_error(y_true, y_pred):
-    return np.mean(np.abs((y_true - y_pred) / (y_true + 0.1))) * 100
+def calculate_metric(y_true, y_pred, metric, verbose=True):
+    """Calculate a specifc classification metric
+
+    Options:
+        - accuracy
+        - Cohen's kappa coefficient 
+        - Recall 
+        - Precision 
+        - F1-score 
+
+    Args:
+        y_true (list): True targets
+        y_pred (list): Predicted targets
+        verbose (bool): Whether to print the statistics
+
+    Returns:
+        res (float): Result of the requested metric
+    """
+    if metric == 'accuracy':
+        res = accuracy_score(y_true, y_pred)
+    elif metric == 'kappa':
+        res = cohen_kappa_score(y_true, y_pred, weights='linear')
+    elif metric == 'recall':
+        res = recall_score(y_true, y_pred, average='weighted')
+    elif metric == 'precision':
+        res = precision_score(y_true, y_pred, average='weighted',
+                zero_division=1)
+    elif metric == 'f1':
+        res = f1_score(y_true, y_pred, average='weighted')
+    else:
+        raise ValueError('Invalid choice of metric.')
+
+    return res 
 
 
-def evaluate_classification_model(y_true, y_pred, verbose=1):
+def evaluate_classification_model(y_true, y_pred, verbose=True):
+    """Function to collect various classification metrics
+
+    Args:
+        y_true (list): True targets
+        y_pred (list): Predicted targets
+        verbose (bool): Whether to print the statistics
+
+    ReturnS:
+        metrics (dict): Metrics, including the accuracy, Cohen's kappa 
+                        coefficient , recall, precision, F1-score and
+                        the confusion matrix
+    """
     kappa = cohen_kappa_score(y_true, y_pred, weights='linear')
     acc = accuracy_score(y_true, y_pred)
     precision = precision_score(y_true, y_pred, average='weighted')
@@ -33,21 +76,28 @@ def evaluate_classification_model(y_true, y_pred, verbose=1):
         print(f'=> Linear Cohen Kappa Score: {kappa}')
         print(f'=> Precision: {precision}')
         print(f'=> Recall: {recall}')
+        print(f'=> F1: {f1}')
         print(f'=> Confusion matrix:\n{cm}')
 
-    return {"accuracy": acc, 'kappa': kappa, 'precision': precision,
-            'recall': recall, 'cm': cm}
+    metrics = {"accuracy": acc, 'kappa': kappa, 'precision': precision,
+            'recall': recall, 'f1': f1, 'cm': cm}
+
+    return metrics
 
 
-def calculate_cohen_kappa(y_true, y_pred, verbose=1):
-    kappa = cohen_kappa_score(y_true, y_pred, weights='linear')
-    if verbose:
-        print(f'=> Linear Cohen Kappa Score: {kappa}')
+def evaluate_regression_model(y_true, y_pred, verbose=True):
+    """Function to collect various regression metrics
 
-    return kappa
+    Args:
+        y_true (list): True targets
+        y_pred (list): Predicted targets
+        verbose (bool): Whether to print the statistics
 
-
-def evaluate_regression_model(y_true, y_pred, verbose=1):
+    Returns:
+        metrics (dict): Metrics, including the mean absolute error, 
+                        the mean squared error, the root mean squared error,
+                        and the mean absolute percentage error.
+    """
     mae = mean_absolute_error(y_true, y_pred)
     mse = mean_squared_error(y_true, y_pred)
     rmse = np.sqrt(mse)
@@ -59,34 +109,45 @@ def evaluate_regression_model(y_true, y_pred, verbose=1):
         print(f'=> Root Mean Squared Error (RMSE): {rmse}')
         print(f'=> Mean Aboslute Perentage Error (MAPE): {mape}')
 
-    return {'mae': mae, 'mse': mse, 'rmse': rmse, 'mape': mape}
+    metrics = {'mae': mae, 'mse': mse, 'rmse': rmse, 'mape': mape}
+
+    return metrics
 
 
-def calculate_mean_absolute_error(y_true, y_pred, verbose=1):
+def calculate_mean_absolute_error(y_true, y_pred, verbose=True):
+    """Function to calculate the mean absolute error
+    
+    Args:
+        y_true (list): True targets
+        y_pred (list): Predicted targets
+        verbose (bool): Whether to print the statistics
+
+    Returns:
+        mae (float): The mean absolute error
+    """
     mae = mean_absolute_error(y_true, y_pred)
+
     if verbose:
         print(f'=> Mean Absolute Error (MAE): {mae}')
 
     return mae
 
 
-def get_confusion_matrix(model, X, y, save_plot='', class_names=['0-1',
-    '1-2', '2-3', '3-4', '4-5', '5-6', '6-7', '7-8', '8-14', '14+']):
-    titles_options = [("Confusion matrix, without normalization", None),
-                    ("Normalized confusion matrix", 'true')]
-    for title, normalize in titles_options:
-        disp = plot_confusion_matrix(model, X, y,
-                                    display_labels=class_names,
-                                    cmap=plt.cm.Blues,
-                                    normalize=normalize)
-        disp.ax_.set_title(title)
+def calculate_cohen_kappa(y_true, y_pred, verbose=True):
+    """Function to calculate Cohen's kappa statistic 
+    
+    Args:
+        y_true (list): True targets
+        y_pred (list): Predicted targets
+        verbose (bool): Whether to print the statistics
 
-        if save_plot:
-            if normalize: save_plot += '_normalized'
-            plt.savefig(save_plot, format="pdf", bbox_inches='tight',
-                    pad_inches=0)
-            plt.close()
-        else:
-            plt.show()
-            plt.close()
+    Returns:
+        kappa (float): The linearly weighted Cohen kappa coefficient 
+    """
+    kappa = cohen_kappa_score(y_true, y_pred, weights='linear')
+
+    if verbose:
+        print(f'=> Linear Cohen Kappa Score: {kappa}')
+
+    return kappa
 
