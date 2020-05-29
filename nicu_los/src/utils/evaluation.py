@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 
 from sklearn.metrics import accuracy_score, cohen_kappa_score, \
         confusion_matrix, f1_score, mean_absolute_error, mean_squared_error, \
-        plot_confusion_matrix, precision_score, recall_score, roc_auc_score
+        precision_score, recall_score, roc_auc_score
 
 
 def calculate_metric(y_true, y_pred, metric, verbose=True):
@@ -153,4 +153,8 @@ def calculate_cohen_kappa(y_true, y_pred, verbose=True):
         print(f'=> Linear Cohen Kappa Score: {kappa}')
 
     return kappa
+
+
+def calculate_confusion_matrix(y_true, y_pred, normalize=None):
+    return confusion_matrix(y_true, y_pred, normalize=normalize)
 
