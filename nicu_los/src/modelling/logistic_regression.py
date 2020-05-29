@@ -7,12 +7,15 @@ Script to create a Logistic Regression baseline.
 
 __author__ = "Bas Straathof"
 
-import argparse, os, pickle
+import argparse, csv, json, os, pickle
 
 import numpy as np
+import pandas as pd
 
 from sys import argv
+from tqdm import tqdm
 
+from sklearn.utils import resample
 from sklearn.linear_model import LogisticRegression
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler
@@ -21,7 +24,8 @@ from sklearn.metrics import make_scorer, cohen_kappa_score
 
 from nicu_los.src.utils.modelling import get_baseline_datasets
 from nicu_los.src.utils.evaluation import calculate_metric, \
-        evaluate_classification_model
+        calculate_confusion_matrix, evaluate_classification_model
+from nicu_los.src.utils.visualization import plot_confusion_matrix 
 
 
 def parse_cl_args():
@@ -29,7 +33,7 @@ def parse_cl_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('-sp', '--subjects-path', type=str,
             default='data', help='Path to the subjects directories.')
-    parser.add_argument('-mp', '--models-path', type=str,
+    parser.add_argument('-mp', '--model-path', type=str,
             default='models/logistic_regression/',
             help='Path to the models directory.')
     parser.add_argument('-mn', '--model-name', type=str, default="",
@@ -55,25 +59,27 @@ def parse_cl_args():
     parser.add_argument('--C', type=float, default=1.0, help=('The Logistic ' \
             'Regression C parameter (i.e. float between 0.0 and 1.0).'))
 
-    parser.add_argument('--training', dest='training', action='store_true')
-    parser.add_argument('--testing', dest='training', action='store_false')
+    parser.add_argument('--training', dest='mode', action='store_const',
+            const='training')
+    parser.add_argument('--prediction', dest='mode', action='store_const',
+            const='prediction')
+    parser.add_argument('--evaluation', dest='mode', action='store_const',
+            const='evaluation')
 
-    parser.add_argument('--K', type=int, default=50, help=('How often to ' +
+    parser.add_argument('--K', type=int, default=1000, help=('How often to ' +
         'perform bootstrap sampling without replacement when evaluating ' +
         'the model'))
-    parser.add_argument('--samples', type=int, default=16000, help=('Number ' +
-    'of test samples per bootstrap'))
 
     parser.set_defaults(pre_imputed=False, grid_search=False,
-            coarse_targets=True, training=True)
+            coarse_targets=True, mode='training')
 
     return parser.parse_args(argv[1:])
 
 
 def main(args):
-    models_path = args.models_path
-    if not os.path.exists(models_path):
-        os.makedirs(models_path)
+    model_path = args.model_path
+    if not os.path.exists(model_path):
+        os.makedirs(model_path)
 
     coarse_targets = args.coarse_targets
     data_path = args.subjects_path
@@ -82,41 +88,53 @@ def main(args):
     pre_imputed = args.pre_imputed
     regularizer = args.regularizer
     C = args.C
+    mode = args.mode
 
-    if args.training:
-        print(f'=> Training {model_name}')
+    if coarse_targets:
+        output_dimension = 3
     else:
-        print(f'=> Evaluating {model_name}')
+        output_dimension = 10
 
-    with open(f'{data_path}/training_subjects.txt', 'r') as f:
-        train_dirs = f.read().splitlines()
-    with open(f'{data_path}/validation_subjects.txt', 'r') as f:
-        val_dirs = f.read().splitlines()
-    with open(f'{data_path}/test_subjects.txt', 'r') as f:
-        test_dirs = f.read().splitlines()
+    if mode == 'training':
+        print(f'=> Training {model_name}')
+    elif mode == 'prediction':
+        print(f'=> Predicting {model_name}.')
+    elif mode == 'evaluation':
+        print(f'=> Evaluating {model_name}.')
+    else:
+        raise ValueError('Parameter "mode" must be one of: "training", ' +
+                '"prediction", "evaluation".')
 
-    X_train, _, y_train = get_baseline_datasets(train_dirs, coarse_targets,
-            pre_imputed)
-    X_val, _, y_val = get_baseline_datasets(val_dirs, coarse_targets,
-            pre_imputed)
-    X_test, _, y_test = get_baseline_datasets(test_dirs, coarse_targets,
-            pre_imputed)
+    if mode == 'training' or mode == 'prediction':
+        with open(f'{data_path}/training_subjects.txt', 'r') as f:
+            train_dirs = f.read().splitlines()
+        with open(f'{data_path}/validation_subjects.txt', 'r') as f:
+            val_dirs = f.read().splitlines()
+        with open(f'{data_path}/test_subjects.txt', 'r') as f:
+            test_dirs = f.read().splitlines()
 
-    if not pre_imputed:
-        print('=> Imputing missing data')
-        imputer = SimpleImputer(missing_values=np.nan, strategy='mean',
-                fill_value='constant', verbose=0, copy=True)
-        X_train = imputer.fit_transform(X_train)
-        X_val = imputer.transform(X_val)
-        X_test = imputer.transform(X_test)
+        X_train, _, y_train = get_baseline_datasets(train_dirs, coarse_targets,
+                pre_imputed)
+        X_val, _, y_val = get_baseline_datasets(val_dirs, coarse_targets,
+                pre_imputed)
+        X_test, _, y_test = get_baseline_datasets(test_dirs, coarse_targets,
+                pre_imputed)
 
-    print('=> Normalizing the data')
-    scaler = StandardScaler()
-    X_train = scaler.fit_transform(X_train)
-    X_val = scaler.transform(X_val)
-    X_test = scaler.transform(X_test)
+        if not pre_imputed:
+            print('=> Imputing missing data')
+            imputer = SimpleImputer(missing_values=np.nan, strategy='mean',
+                    fill_value='constant', verbose=0, copy=True)
+            X_train = imputer.fit_transform(X_train)
+            X_val = imputer.transform(X_val)
+            X_test = imputer.transform(X_test)
 
-    if args.training:
+        print('=> Normalizing the data')
+        scaler = StandardScaler()
+        X_train = scaler.fit_transform(X_train)
+        X_val = scaler.transform(X_val)
+        X_test = scaler.transform(X_test)
+
+    if mode == 'training':
         print(f'=> Training {model_name}')
         print(f'=> Pre-imputed features: {pre_imputed}')
         print(f'=> Coarse targets: {coarse_targets}')
@@ -181,7 +199,7 @@ def main(args):
 
         if model_name:
             print('=> Saving the model')
-            f_name = os.path.join(models_path, f'results_{model_name}.txt')
+            f_name = os.path.join(model_path, f'results_{model_name}.txt')
 
             with open(f_name, "a") as f:
                 if grid_search:
@@ -196,59 +214,99 @@ def main(args):
                 for k, v in test_scores.items():
                     f.write(f'\t\t{k}: {v}\n')
 
-            f_name = os.path.join(models_path, f'best_model_{model_name}.pkl')
+            f_name = os.path.join(model_path, f'best_model_{model_name}.pkl')
 
             with open(f_name, 'wb') as f:
                 pickle.dump(clf, f)
 
-    else: # evaluation
-        K = args.K
-        samples = args.samples
+    elif mode == 'prediction':
+        predictions_dir = os.path.join(model_path, 'predictions', model_name)
+        if not os.path.exists(predictions_dir):
+            os.makedirs(predictions_dir)
+        f_name_predictions = os.path.join(predictions_dir, f'predictions.csv')
 
-        f_name = os.path.join(models_path, f'best_model_{model_name}.pkl')
+        f_clf = os.path.join(model_path, f'best_model_{model_name}.pkl')
+        with open(f_clf, 'rb') as f:
+            clf = pickle.load(f)
+
+        y_pred = clf.predict_proba(X_test)
+        y_pred = np.argmax(y_pred, axis=1)
+
+        print(f'=> Writing results to {f_name_predictions}')
+        with open(f_name_predictions, 'w') as f:
+            writer = csv.writer(f)
+            writer.writerow(['True labels', 'Predictions'])
+            writer.writerows(zip(y_test, y_pred))
+
+    elif mode == 'evaluation':
+        f_name_predictions = os.path.join(model_path, 'predictions',
+                model_name, 'predictions.csv')
+        if not os.path.exists(f_name_predictions):
+            raise FileNotFoundError("File note found: make sure to predict " +
+                    "first.")
+
+        results_dir = os.path.join(model_path, 'results', model_name)
+        if not os.path.exists(results_dir):
+            os.makedirs(results_dir)
+        f_name_results = os.path.join(results_dir, f'results.json')
+        f_name_confusion_matrix = os.path.join(results_dir, f'cm.pdf')
+        f_name_confusion_matrix_normalized = os.path.join(results_dir,
+                f'cm_normalized.pdf')
+
+        f_name = os.path.join(model_path, f'best_model_{model_name}.pkl')
         with open(f_name, 'rb') as f:
             clf = pickle.load(f)
 
-        results_dir = os.path.join(models_path, 'results', model_name)
-        if not os.path.exists(results_dir):
-            os.makedirs(results_dir)
-        f_name_results = os.path.join(results_dir, f'results.txt')
+        # Open the dataframe containing all predicitons on the test set
+        df_pred = pd.read_csv(f_name_predictions, index_col=False)
 
-        print(f'=> Bootrapping evaluation (K={K}, samples={samples})')
-        accs, kappas, recalls, precisions, f1s = [], [], [], [], []
-        for _ in range(K):
-            indices = np.random.choice(X_test.shape[0], samples, replace=False)
+        print(f'=> K={args.K} bootstrapping rounds')
 
-            test_preds = clf.predict_proba(X_test[indices])
-            test_preds = np.argmax(test_preds, axis=1)
-            test_true = y_test[indices]
-
-            accs.append(calculate_metric(test_true, test_preds, metric='accuracy',
-                verbose=False))
-            kappas.append(calculate_metric(test_true, test_preds, metric='kappa',
-                verbose=False))
-            recalls.append(calculate_metric(test_true, test_preds, metric='recall',
-                verbose=False))
-            precisions.append(calculate_metric(test_true, test_preds,
-                metric='precision', verbose=False))
-            f1s.append(calculate_metric(test_true, test_preds, metric='f1',
-                verbose=False))
+        metrics = ['accuracy', 'kappa', 'recall', 'precision', 'f1']
+        results = {'iters': args.K}
         
-        print(f"Cohen's kappa:\n\tmean {np.mean(kappas)}\n\tstd-dev {np.std(kappas)}")
+        for m in metrics:
+            results[m] = dict()
+            results[m]['iters'] = []
 
-        with open(f_name_results, "a") as f:
-            f.write(f'- Test scores K={K}, samples={samples}:\n')
-            f.write(f"\tAccuracy mean: {np.mean(accs)}\n")
-            f.write(f"\tAccuracy std-dev: {np.std(accs)}\n")
-            f.write(f"\tCohen's kappa mean: {np.mean(kappas)}\n")
-            f.write(f"\tCohen's kappa std-dev: {np.std(kappas)}\n")
-            f.write(f"\tRecall mean: {np.mean(recalls)}\n")
-            f.write(f"\tRecall std-dev: {np.std(recalls)}\n")
-            f.write(f"\tPrecision mean: {np.mean(precisions)}\n")
-            f.write(f"\tPrecision std-dev: {np.std(precisions)}\n")
-            f.write(f"\tF1 mean: {np.mean(f1s)}\n")
-            f.write(f"\tF1 std-dev: {np.std(f1s)}\n")
+        for k in tqdm(range(args.K)):
+            y_true = df_pred['True labels'].to_numpy()
+            y_true = resample(y_true, random_state=k)
+            y_pred = df_pred['Predictions'].to_numpy()
+            y_pred = resample(y_pred, random_state=k)
+
+            for m in metrics:
+                results[m]['iters'].append(calculate_metric(y_true, y_pred,
+                    metric=m, verbose=False))
+
+        for m in metrics:
+            iters = results[m]['iters']
+            results[m]['mean'] = np.mean(iters)
+            results[m]['median'] = np.median(iters)
+            results[m]['std'] = np.std(iters)
+            results[m]['2.5 percentile'] = np.percentile(iters, 2.5)
+            results[m]['97.5 percentile'] = np.percentile(iters, 97.5)
+            del results[m]['iters']
+
+        # Create and plot confusion matrix
+        y_true = df_pred['True labels'].to_numpy()
+        y_pred = df_pred['Predictions'].to_numpy()
+
+        cm = calculate_confusion_matrix(y_true, y_pred)
+        cm_normalized = calculate_confusion_matrix(y_true, y_pred,
+                normalize='pred')
         
+        plot_confusion_matrix(cm, output_dimension, f_name_confusion_matrix)
+        plot_confusion_matrix(cm_normalized, output_dimension, 
+                f_name_confusion_matrix_normalized)
+
+        results['confusion matrix'] = cm.tolist()
+        results['confusion matrix normalized'] = cm_normalized.tolist()
+
+        print(f'=> Writing results to {f_name_results}')
+        with open(f_name_results, 'w') as f:
+            json.dump(results, f)
+
 
 if __name__ == '__main__':
     main(parse_cl_args())
