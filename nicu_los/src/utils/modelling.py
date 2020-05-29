@@ -94,17 +94,19 @@ def data_generator(reader, steps, batch_size, task, shuffle=True):
     n_examples = reader.get_number_of_sequences()
     if not steps:
         steps = (n_examples + batch_size - 1) // batch_size
-        n_examples_epoch = n_examples
+        n_examples_epoch = 1024
+        print(f"\n==> {reader.name} -- number of examples:",
+                n_examples)
     else:
         n_examples_epoch = steps * batch_size
-    print(f"\n==> {reader.name} -- number of examples per epoch:",
-            n_examples_epoch)
+        print(f"\n==> {reader.name} -- number of examples per epoch:",
+                n_examples_epoch)
 
     # Set a limit on the size of the chunk to be read
     chunk_size = min(1024, steps) * batch_size
 
     while True:
-        # Shuffle once per epoch
+        # Shuffle once per training round
         if shuffle:
             if (reader.current_index == 0) or (reader.current_index >
                 batch_size*steps):
@@ -118,7 +120,10 @@ def data_generator(reader, steps, batch_size, task, shuffle=True):
 
             data = reader.read_chunk(current_size)
 
-            (Xs, ys, ts) = sort_and_batch_shuffle(data, batch_size)
+            if batch_size > 1:
+                (Xs, ys, ts) = sort_and_batch_shuffle(data, batch_size)
+            else:
+                Xs, ys, ts = data['X'], data['y'], data['t']
 
             for i in range(0, current_size, batch_size):
                 X = zero_pad_timeseries(Xs[i:i + batch_size])
