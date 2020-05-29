@@ -343,6 +343,56 @@ def construct_fcn(input_dimension, output_dimension, hid_dimension_lstm=8,
     inputs = Input(shape=(None, input_dimension))
 
     X = Conv1D(128, 8, padding='same',
+            kernel_initializer='he_uniform')(inputs)
+    X = Activation('relu')(X)
+    X = BatchNormalization()(X)
+    X = SpatialDropout1D(0.5)(X)
+    X = squeeze_excite_block(X)
+
+    X = Conv1D(256, 5, padding='same', kernel_initializer='he_uniform')(X)
+    X = Activation('relu')(X)
+    X = BatchNormalization()(X)
+    X = SpatialDropout1D(0.5)(X)
+    X = squeeze_excite_block(X)
+
+    X = Conv1D(128, 3, padding='same', kernel_initializer='he_uniform')(X)
+    X = Activation('relu')(X)
+    X = BatchNormalization()(X)
+
+    X = GlobalAveragePooling1D()(X)
+
+    if output_dimension != 1:
+        # Classification
+        outputs = Dense(units=output_dimension, activation='softmax')(X)
+    else:
+        # Regression 
+        outputs = Dense(units=output_dimension)(X)
+
+    model = Model(inputs=inputs, outputs=outputs, name=model_name)
+
+    return model
+
+
+def construct_fcn_originial(input_dimension, output_dimension,
+        hid_dimension_lstm=8, model_name=""):
+    """Construct an FCN model for multivariate time series classification
+    
+    (Karim et al. 2019 - Multivariate LSTM-FCNs for time series classification)
+
+    Args:
+        input_dimension (int): Input dimension of the model
+        output_dimension (int): Output dimension of the model
+        hid_dimension (int): Dimension of the hidden layer (i.e. # of unit in
+                             the RNN cell)
+        model_name (str): Name of the model
+
+    Returns:
+        model (tf.keras.Model): Constructed CN model
+    """
+
+    inputs = Input(shape=(None, input_dimension))
+
+    X = Conv1D(128, 8, padding='same',
            kernel_initializer='he_uniform')(inputs)
     X = BatchNormalization()(X2)
     X = Activation('relu')(X2)
@@ -468,7 +518,6 @@ def construct_lstm_fcn(input_dimension, output_dimension, dropout=0.8,
 
     X2 = Conv1D(128, 3, padding='same', kernel_initializer='he_uniform')(X2)
     X2 = Activation('relu')(X2)
-    #X2 = Dropout(0.5)(X2)
     X2 = BatchNormalization()(X2)
 
     X2 = GlobalAveragePooling1D()(X2)
