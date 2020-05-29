@@ -10,12 +10,14 @@ __author__ = "Bas Straathof"
 
 import tensorflow as tf
 
-import argparse, json, os
+import argparse, csv, json, os
 import numpy as np
+import pandas as pd
 
 from sys import argv
 from datetime import datetime
 from tqdm import tqdm
+from sklearn.utils import resample
 
 import tensorflow as tf
 from tensorflow.keras.callbacks import CSVLogger, EarlyStopping, \
@@ -24,7 +26,8 @@ from tensorflow.keras.callbacks import CSVLogger, EarlyStopping, \
 from nicu_los.src.utils.modelling import construct_and_compile_model, \
         create_list_file, data_generator, MetricsCallback
 from nicu_los.src.utils.evaluation import calculate_metric, \
-        calculate_mean_absolute_error
+        calculate_mean_absolute_error, calculate_confusion_matrix
+from nicu_los.src.utils.visualization import plot_confusion_matrix 
         
 from nicu_los.src.utils.readers import TimeSeriesReader
 
@@ -82,8 +85,12 @@ def parse_cl_args():
     parser.add_argument('--no-gestational-age', dest='gestational_age',
             action='store_false')
 
-    parser.add_argument('--training', dest='training', action='store_true')
-    parser.add_argument('--testing', dest='training', action='store_false')
+    parser.add_argument('--training', dest='mode', action='store_const',
+            const='training')
+    parser.add_argument('--prediction', dest='mode', action='store_const',
+            const='prediction')
+    parser.add_argument('--evaluation', dest='mode', action='store_const',
+            const='evaluation')
 
     parser.add_argument('--metrics-callback', dest='metrics_callback',
             action='store_true')
@@ -106,13 +113,11 @@ def parse_cl_args():
     parser.add_argument('--lr-scheduler', dest='lr_scheduler', action='store_true',
             help='Whether to use the learning rate scheduler.')
 
-    parser.add_argument('--K', type=int, default=50, help=('How often to ' +
+    parser.add_argument('--K', type=int, default=1000, help=('How often to ' +
         'perform bootstrap sampling without replacement when evaluating ' +
         'the model'))
-    parser.add_argument('--samples', type=int, default=16000, help=('Number ' +
-    'of test samples per bootstrap'))
 
-    parser.set_defaults(enable_gpu=False, training=True, coarse_targets=True,
+    parser.set_defaults(enable_gpu=False, mode='training', coarse_targets=True,
             mask_indicator=True, metrics_callback=False, task='classification',
             allow_growth=False, gestational_age=True, lr_scheduler=False)
 
@@ -130,7 +135,7 @@ def main(args):
     model_name = args.model_name
     model_type = args.model_type
     task = args.task
-    training = args.training
+    mode = args.mode
     training_steps = args.training_steps
     validation_steps = args.validation_steps
 
@@ -149,12 +154,17 @@ def main(args):
         print('=> Using CPU(s)')
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
-    if training:
+    if mode == 'training':
         print(f'=> Training {model_name}') 
         print(f'=> Early stopping: {early_stopping}')
-        print(f'=> Task: {task}')
-    else:
+    elif mode == 'prediction':
+        print(f'=> Predicting with {model_name}') 
+    elif mode == 'evaluation':
         print(f'=> Evaluating {model_name}') 
+    else:
+        raise ValueError('Parameter "mode" must be one of: "training", ' +
+                '"prediction", "evaluation"')
+    print(f'=> Task: {task}')
 
     if task == "classification":
         print(f'=> Coarse targets: {coarse_targets}')
@@ -170,7 +180,7 @@ def main(args):
     if not os.path.exists(checkpoints_dir):
         os.makedirs(checkpoints_dir)
 
-    if training:
+    if mode == 'training':
         log_dir = os.path.join(model_path, 'logs', model_name + \
                 f'-batch{batch_size}-steps{training_steps}')
         if not os.path.exists(log_dir):
@@ -214,7 +224,7 @@ def main(args):
         model = construct_and_compile_model(model_type, model_name, task,
                 checkpoint_file, checkpoints_dir, model_params)
 
-    if training:
+    if mode == 'training':
         train_list_file = os.path.join(data_path, 'train_list.txt')
         if not os.path.exists(train_list_file):
             with open(f'{data_path}/training_subjects.txt', 'r') as f:
@@ -290,17 +300,11 @@ def main(args):
             initial_epoch=args.initial_epoch, steps_per_epoch=training_steps,
             validation_steps=validation_steps, callbacks=callbacks)
 
-    else: # evaluation
-        K = args.K
-        samples = args.samples
-        print(f'=> Bootstrapping evaluation (K={K}, samples={samples})')
-        test_steps = samples // batch_size
-
-        results_dir = os.path.join(model_path, 'results', \
-                f'batch{batch_size}-test_steps{test_steps}-K{K}-' + checkpoint_file)
-        if not os.path.exists(results_dir):
-            os.makedirs(results_dir)
-        f_name_results = os.path.join(results_dir, f'results_new.txt')
+    elif mode == 'prediction': 
+        predictions_dir = os.path.join(model_path, 'predictions', checkpoint_file)
+        if not os.path.exists(predictions_dir):
+            os.makedirs(predictions_dir)
+        f_name_predictions = os.path.join(predictions_dir, f'predictions.csv')
 
         test_list_file = os.path.join(data_path, 'test_list.txt')
         if not os.path.exists(test_list_file):
@@ -311,88 +315,108 @@ def main(args):
         test_reader = TimeSeriesReader(test_list_file,
                 coarse_targets=coarse_targets, mask=mask,
                 gestational_age=gestational_age, name="test_reader")
-        test_data_generator = data_generator(test_reader, test_steps,
-                batch_size, task)
+        n_seqs = test_reader.get_number_of_sequences()
+        total_n_steps = n_seqs//batch_size
+
+        # steps = None signifies read all
+        test_data_generator = data_generator(test_reader, None, batch_size, task,
+                shuffle=False)
 
         test_data = tf.data.Dataset.from_generator(lambda: test_data_generator,
                 output_types=(tf.float32, tf.int16),
                 output_shapes=((batch_size, None, len(variables)),
                     (batch_size,)))
 
-        if task == "regression":
-            MAEs = []
-            for k in range(K):
-                if (k % 5) == 0:
-                    print(f'Iteration {k}/{K}')
-                y_true, y_pred = [], []
-                for batch, (x, y) in enumerate(test_data):
-                    if batch == test_steps:
-                        break
+        y_true, y_pred = [], []
+        for batch, (x, y) in enumerate(tqdm(test_data, total=(total_n_steps))):
+            if batch == total_n_steps:
+                break
 
-                    y_true.append(y.numpy())
-                    y_pred.append(model.predict_on_batch(x))
+            y_true.append(y.numpy())
+            if task == "regression":
+                y_pred.append(model.predict_on_batch(x))
+            else: # classification
+                y_pred.append(np.argmax(model.predict_on_batch(x), axis=1))
 
-                y_pred = np.concatenate(y_pred).ravel()
-                y_pred = np.maximum(y_pred, 0) # remaining LOS can't be negative
-                y_true = np.concatenate(y_true).ravel()
+        y_pred = np.concatenate(y_pred).ravel()
+        y_pred = np.maximum(y_pred, 0) # remaining LOS can't be negative
+        y_true = np.concatenate(y_true).ravel()
 
-                mae = calculate_mean_absolute_error(y_true, y_pred,
-                        verbose=False)
-                MAEs.append(mae)
+        print(f'=> Writing results to {f_name_predictions}')
+        with open(f_name_predictions, 'w') as f:
+            writer = csv.writer(f)
+            writer.writerow(['True labels', 'Predictions'])
+            writer.writerows(zip(y_true, y_pred))
 
-            mean_MAE = np.mean(MAEs)
-            std_MAE = np.std(MAEs)
-            print(f"MAE:\n\tmean {mean_MAE}\n\tstd-dev {std_MAE}")
+    elif mode == 'evaluation': 
+        f_name_predictions = os.path.join(model_path, 'predictions',
+                checkpoint_file, 'predictions.csv')
+        if not os.path.exists(f_name_predictions):
+            raise FileNotFoundError("File note found: make sure to predict " +
+                    "first.")
 
-            print(f'=> Writing results to {f_name_results}')
-            with open(f_name_results, "a") as f:
-                f.write(f'- Test scores K={K}, samples={samples}:\n')
-                f.write(f'\tMAE mean: {mean_MAE}\n')
-                f.write(f'\tMAE std-dev: {std_MAE}\n')
+        results_dir = os.path.join(model_path, 'results', f'results-' +
+                checkpoint_file)
+        if not os.path.exists(results_dir):
+            os.makedirs(results_dir)
+        f_name_results = os.path.join(results_dir, f'results.json')
+        f_name_confusion_matrix = os.path.join(results_dir, f'cm.pdf')
+        f_name_confusion_matrix_normalized = os.path.join(results_dir,
+                f'cm_normalized.pdf')
 
-        if task == "classification":
-            accs, kappas, recalls, precisions, f1s = [], [], [], [], []
-            for k in range(K):
-                if (k % 5) == 0:
-                    print(f'Iteration {k}/{K}')
-                y_true, y_pred = [], []
-                for batch, (x, y) in enumerate(test_data):
-                    if batch == test_steps:
-                        break
+        # Open the dataframe containing all predicitons on the test set
+        df_pred = pd.read_csv(f_name_predictions, index_col=False)
 
-                    y_true.append(y.numpy())
-                    y_pred.append(np.argmax(model.predict_on_batch(x), axis=1))
+        print(f'=> K={args.K} bootstrapping rounds')
 
-                y_pred = np.concatenate(y_pred).ravel()
-                y_true = np.concatenate(y_true).ravel()
+        if task == 'regression':
+            metrics = ['MAE']
+        else:
+            metrics = ['accuracy', 'kappa', 'recall', 'precision', 'f1']
 
-                accs.append(calculate_metric(y_true, y_pred, metric='accuracy',
-                    verbose=False))
-                kappas.append(calculate_metric(y_true, y_pred, metric='kappa',
-                    verbose=False))
-                recalls.append(calculate_metric(y_true, y_pred, metric='recall',
-                    verbose=False))
-                precisions.append(calculate_metric(y_true, y_pred,
-                    metric='precision', verbose=False))
-                f1s.append(calculate_metric(y_true, y_pred, metric='f1',
-                    verbose=False))
+        results = {'iters': args.K}
+        
+        for m in metrics:
+            results[m] = dict()
+            results[m]['iters'] = []
 
-            print(f"Cohen's kappa:\n\tmean {np.mean(kappas)}\n\tstd-dev " +
-                    f"{np.std(kappas)}")
+        for k in tqdm(range(args.K)):
+            y_true = df_pred['True labels'].to_numpy()
+            y_true = resample(y_true, random_state=k)
+            y_pred = df_pred['Predictions'].to_numpy()
+            y_pred = resample(y_pred, random_state=k)
 
-            print(f'=> Writing results to {f_name_results}')
-            with open(f_name_results, "a") as f:
-                f.write(f'- Test scores K={K}, samples={samples}:\n')
-                f.write(f"\tAccuracy mean: {np.mean(accs)}\n")
-                f.write(f"\tAccuracy std-dev: {np.std(accs)}\n")
-                f.write(f"\tCohen's kappa mean: {np.mean(kappas)}\n")
-                f.write(f"\tCohen's kappa std-dev: {np.std(kappas)}\n")
-                f.write(f"\tRecall mean: {np.mean(recalls)}\n")
-                f.write(f"\tRecall std-dev: {np.std(recalls)}\n")
-                f.write(f"\tPrecision mean: {np.mean(precisions)}\n")
-                f.write(f"\tPrecision std-dev: {np.std(precisions)}\n")
-                f.write(f"\tF1 mean: {np.mean(f1s)}\n")
-                f.write(f"\tF1 std-dev: {np.std(f1s)}\n")
+            for m in metrics:
+                results[m]['iters'].append(calculate_metric(y_true, y_pred,
+                    metric=m, verbose=False))
+
+        for m in metrics:
+            iters = results[m]['iters']
+            results[m]['mean'] = np.mean(iters)
+            results[m]['median'] = np.median(iters)
+            results[m]['std'] = np.std(iters)
+            results[m]['2.5 percentile'] = np.percentile(iters, 2.5)
+            results[m]['97.5 percentile'] = np.percentile(iters, 97.5)
+            del results[m]['iters']
+
+        # Create and plot confusion matrix
+        y_true = df_pred['True labels'].to_numpy()
+        y_pred = df_pred['Predictions'].to_numpy()
+
+        cm = calculate_confusion_matrix(y_true, y_pred)
+        cm_normalized = calculate_confusion_matrix(y_true, y_pred,
+                normalize='pred')
+        
+        plot_confusion_matrix(cm, output_dimension, f_name_confusion_matrix)
+        plot_confusion_matrix(cm_normalized, output_dimension, 
+                f_name_confusion_matrix_normalized)
+
+        results['confusion matrix'] = cm.tolist()
+        results['confusion matrix normalized'] = cm_normalized.tolist()
+
+        print(f'=> Writing results to {f_name_results}')
+        with open(f_name_results, 'w') as f:
+            json.dump(results, f)
 
 
 if __name__ == '__main__':
