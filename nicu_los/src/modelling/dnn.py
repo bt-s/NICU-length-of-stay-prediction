@@ -360,9 +360,11 @@ def main(args):
         if not os.path.exists(results_dir):
             os.makedirs(results_dir)
         f_name_results = os.path.join(results_dir, f'results.json')
-        f_name_confusion_matrix = os.path.join(results_dir, f'cm.pdf')
-        f_name_confusion_matrix_normalized = os.path.join(results_dir,
-                f'cm_normalized.pdf')
+
+        if task == 'classification':
+            f_name_confusion_matrix = os.path.join(results_dir, f'cm.pdf')
+            f_name_confusion_matrix_normalized = os.path.join(results_dir,
+                    f'cm_normalized.pdf')
 
         # Open the dataframe containing all predicitons on the test set
         df_pred = pd.read_csv(f_name_predictions, index_col=False)
@@ -399,20 +401,21 @@ def main(args):
             results[m]['97.5 percentile'] = np.percentile(iters, 97.5)
             del results[m]['iters']
 
-        # Create and plot confusion matrix
-        y_true = df_pred['True labels'].to_numpy()
-        y_pred = df_pred['Predictions'].to_numpy()
+        if task == 'classification':
+            # Create and plot confusion matrix
+            y_true = df_pred['True labels'].to_numpy()
+            y_pred = df_pred['Predictions'].to_numpy()
 
-        cm = calculate_confusion_matrix(y_true, y_pred)
-        cm_normalized = calculate_confusion_matrix(y_true, y_pred,
-                normalize='pred')
+            cm = calculate_confusion_matrix(y_true, y_pred)
+            cm_normalized = calculate_confusion_matrix(y_true, y_pred,
+                    normalize='pred')
         
-        plot_confusion_matrix(cm, output_dimension, f_name_confusion_matrix)
-        plot_confusion_matrix(cm_normalized, output_dimension, 
-                f_name_confusion_matrix_normalized)
+            plot_confusion_matrix(cm, output_dimension, f_name_confusion_matrix)
+            plot_confusion_matrix(cm_normalized, output_dimension, 
+                    f_name_confusion_matrix_normalized)
 
-        results['confusion matrix'] = cm.tolist()
-        results['confusion matrix normalized'] = cm_normalized.tolist()
+            results['confusion matrix'] = cm.tolist()
+            results['confusion matrix normalized'] = cm_normalized.tolist()
 
         print(f'=> Writing results to {f_name_results}')
         with open(f_name_results, 'w') as f:
