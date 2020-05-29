@@ -25,6 +25,7 @@ def calculate_metric(y_true, y_pred, metric, verbose=True):
         - Recall 
         - Precision 
         - F1-score 
+        - MAE (Mean Absolute Error)
 
     Args:
         y_true (list): True targets
@@ -45,6 +46,8 @@ def calculate_metric(y_true, y_pred, metric, verbose=True):
                 zero_division=1)
     elif metric == 'f1':
         res = f1_score(y_true, y_pred, average='weighted')
+    elif metric == 'MAE':
+        res = mean_absolute_error(y_true, y_pred)
     else:
         raise ValueError('Invalid choice of metric.')
 
