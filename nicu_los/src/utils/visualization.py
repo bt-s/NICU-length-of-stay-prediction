@@ -9,6 +9,7 @@ __author__ = "Bas Straathof"
 
 import matplotlib.pyplot as plt
 import numpy as np
+from sklearn.metrics import ConfusionMatrixDisplay
 
 
 def create_histogram(input_data, title='', rotation=0, fig_size=(12.376, 8),
@@ -86,4 +87,22 @@ def create_histogram(input_data, title='', rotation=0, fig_size=(12.376, 8),
     else:
         plt.show()
         plt.close()
+
+
+def plot_confusion_matrix(cm, labels=3, fname=''):
+    """Plot the confusion matrix and save to file
+
+    Args:
+        cm (np.ndarray): The confusion matrix
+        labels (int): Number of labels
+        fname (str): Path to file for saving
+    """
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm,
+            display_labels=range(labels))
+
+    fig = disp.plot(include_values=True, cmap=plt.cm.Blues, ax=None,
+            xticks_rotation='horizontal', values_format=None)
+    fig = fig.figure_
+
+    fig.savefig(fname, format='pdf', bbox_inches='tight', pad_inces=0)
 
