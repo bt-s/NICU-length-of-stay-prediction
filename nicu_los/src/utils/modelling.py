@@ -137,7 +137,7 @@ def data_generator(reader, steps, batch_size, task, shuffle=True):
 
 
 def get_baseline_datasets(subject_dirs, coarse_targets=False, pre_imputed=False,
-        targets_only=False):
+        targets_only=False, config='nicu_los/config.json'):
     """Obtain baseline data sets
 
     Args:
@@ -156,7 +156,7 @@ def get_baseline_datasets(subject_dirs, coarse_targets=False, pre_imputed=False,
         tot_num_sub_seqs += len(pd.read_csv(os.path.join(sd,
             'timeseries.csv')))
 
-    with open('nicu_los/config.json') as f:
+    with open(config) as f:
         config = json.load(f)
         variables = config['variables']
         sub_seqs = config['baseline_subsequences']

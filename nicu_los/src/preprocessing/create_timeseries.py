@@ -28,6 +28,9 @@ def parse_cl_args():
     parser.add_argument('-sp', '--subjects-path', type=str, default='data',
             help='Path to subject directories.')
 
+    parser.add_argument('-c', '--config', type=str,
+            default='nicu_los/config.json', help='Path to the config file')
+
     return parser.parse_args(argv[1:])
 
 
@@ -189,7 +192,7 @@ def los_hours_to_target(hours, coarse):
 def main(args):
     subjects_path = args.subjects_path
 
-    with open('nicu_los/config.json') as f:
+    with open(args.config) as f:
         config = json.load(f)
         variables = config['variables']
 

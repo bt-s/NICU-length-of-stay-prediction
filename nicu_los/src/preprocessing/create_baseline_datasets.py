@@ -35,6 +35,9 @@ def parse_cl_args():
     parser.add_argument('--not-pre-imputed', dest='pre_imputed',
             action='store_false')
 
+    parser.add_argument('-c', '--config', type=str,
+            default='nicu_los/config.json', help='Path to the config file')
+
     parser.set_defaults(pre_imputed=False)
 
     return parser.parse_args(argv[1:])
@@ -150,6 +153,7 @@ def create_baseline_datasets_per_subject(subject_dir, variables, stat_fns,
 
 
 def main(args):
+    config = args.config
     subjects_path = args.subjects_path
 
     train_sub_path = os.path.join(subjects_path, 'training_subjects.txt')
@@ -163,7 +167,7 @@ def main(args):
     with open(test_sub_path, 'r') as f:
         test_dirs = f.read().splitlines()
 
-    with open('nicu_los/config.json') as f:
+    with open(config) as f:
         config = json.load(f)
         variables = config['variables']
         subseqs = config['baseline_subsequences']

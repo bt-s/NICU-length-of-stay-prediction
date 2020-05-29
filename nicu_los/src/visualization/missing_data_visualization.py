@@ -26,6 +26,8 @@ def parse_cl_args():
             help='Path to subject directories.')
     parser.add_argument('-pp', '--plots-path', type=str, default='plots/',
             help='Path to plots directory.')
+    parser.add_argument('-c', '--config', type=str,
+            default='nicu_los/config.json', help='Path to the config file')
 
     return parser.parse_args(argv[1:])
 
@@ -47,7 +49,7 @@ def main(args):
             los_remaining_targets_coarse, los_targets_fine, \
             los_remaining_targets_fine =  [], [], [], [], [], []
 
-    with open('nicu_los/config.json') as f:
+    with open(args.config) as f:
         config = json.load(f)
         variables = config['variables']
 

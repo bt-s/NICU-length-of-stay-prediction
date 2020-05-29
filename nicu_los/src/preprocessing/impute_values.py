@@ -28,6 +28,8 @@ def parse_cl_args():
             help='Impute method to use: either "ffill" or "zeros".')
     parser.add_argument('-ma', '--mask', type=str, default=True,
             help='Whether to create binary imputation indicator variables.')
+    parser.add_argument('-c', '--config', type=str,
+            default='nicu_los/config.json', help='Path to the config file')
 
     return parser.parse_args(argv[1:])
 
@@ -85,7 +87,7 @@ def impute(sd, imputation_values, method='ffill', mask=True):
 def main(args):
     impute_method = args.impute_method
 
-    with open('nicu_los/config.json') as f:
+    with open(args.config) as f:
         config = json.load(f)
         imputation_values = config['imputation_values']
 

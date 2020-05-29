@@ -32,6 +32,8 @@ def parse_cl_args():
             help='Path to the output file.')
     parser.add_argument('-v', '--verbose', type=int,
             help='Level of verbosity in console output.', default=1)
+    parser.add_argument('-c', '--config', type=str,
+            default='nicu_los/config.json', help='Path to the config file')
 
     return parser.parse_args(sys.argv[1:])
 
@@ -110,7 +112,7 @@ def remove_invalid_values(df_events, valid_ranges, value_counts):
 def main(args):
     subjects_path, verbose = args.subjects_path, args.verbose
 
-    with open('nicu_los/config.json') as f:
+    with open(args.config) as f:
         config = json.load(f)
         vars_to_itemid = config['vars_to_itemid']
         valid_ranges = config['valid_variable_ranges']

@@ -117,6 +117,9 @@ def parse_cl_args():
         'perform bootstrap sampling without replacement when evaluating ' +
         'the model'))
 
+    parser.add_argument('-c', '--config', type=str,
+            default='nicu_los/config.json', help='Path to the config file')
+
     parser.set_defaults(enable_gpu=False, mode='training', coarse_targets=True,
             mask_indicator=True, metrics_callback=False, task='classification',
             allow_growth=False, gestational_age=True, lr_scheduler=False)
@@ -138,6 +141,7 @@ def main(args):
     mode = args.mode
     training_steps = args.training_steps
     validation_steps = args.validation_steps
+    config = args.config
 
     if args.enable_gpu:
         print('=> Using GPU(s)')
@@ -145,7 +149,7 @@ def main(args):
         assert len(physical_devices) > 0, \
                 "Not enough GPU hardware devices available"
         for i, _ in enumerate(physical_devices):
-            config = tf.config.experimental.set_memory_growth(
+            config_ = tf.config.experimental.set_memory_growth(
                     physical_devices[i], args.allow_growth)
         print(f'=> Allow growth: {args.allow_growth}')
         strategy = tf.distribute.MirroredStrategy()
@@ -192,7 +196,7 @@ def main(args):
             os.makedirs(log_dir_tb)
 
     # Obtain the training variables
-    with open('nicu_los/config.json') as f:
+    with open(config) as f:
         config = json.load(f)
         variables = config['variables']
 

@@ -27,6 +27,8 @@ def parse_cl_args():
             help='Path to the train directories.')
     parser.add_argument('-tep', '--test-path', type=str, default='data/test',
             help='Path to the testdirectories.')
+    parser.add_argument('-c', '--config', type=str,
+            default='nicu_los/config.json', help='Path to the config file')
 
     return parser.parse_args(argv[1:])
 
@@ -56,7 +58,7 @@ def normalize(sd, normalization_statistics, variables):
 
 
 def main(args):
-    with open('nicu_los/config.json') as f:
+    with open(args.config) as f:
         config = json.load(f)
         normalization_statistics = config['normalization_statistics']
         variables = config['variables']

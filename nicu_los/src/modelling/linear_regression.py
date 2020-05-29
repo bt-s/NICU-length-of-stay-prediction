@@ -51,6 +51,9 @@ def parse_cl_args():
         'perform bootstrap sampling without replacement when evaluating ' +
         'the model'))
 
+    parser.add_argument('-c', '--config', type=str,
+            default='nicu_los/config.json', help='Path to the config file')
+
     parser.set_defaults(pre_imputed=False, mode='training')
 
     return parser.parse_args(argv[1:])
@@ -62,6 +65,7 @@ def main(args):
     model_name = args.model_name
     model_path = args.model_path
     mode = args.mode
+    config = args.config
 
     if not os.path.exists(model_path):
         os.makedirs(model_path)
@@ -87,10 +91,11 @@ def main(args):
             test_dirs = f.read().splitlines()
 
         X_train, y_train, _ = get_baseline_datasets(train_dirs,
-                pre_imputed=pre_imputed)
-        X_val, y_val, _ = get_baseline_datasets(val_dirs, pre_imputed=pre_imputed)
+                pre_imputed=pre_imputed, config=config)
+        X_val, y_val, _ = get_baseline_datasets(val_dirs, pre_imputed=pre_imputed,
+                config=config)
         X_test, y_test, _ = get_baseline_datasets(test_dirs,
-                pre_imputed=pre_imputed)
+                pre_imputed=pre_imputed, config=config)
 
         if not pre_imputed:
             print('=> Imputing missing data')

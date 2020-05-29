@@ -70,6 +70,9 @@ def parse_cl_args():
         'perform bootstrap sampling without replacement when evaluating ' +
         'the model'))
 
+    parser.add_argument('-c', '--config', type=str,
+            default='nicu_los/config.json', help='Path to the config file')
+
     parser.set_defaults(pre_imputed=False, grid_search=False,
             coarse_targets=True, mode='training')
 
@@ -89,6 +92,7 @@ def main(args):
     regularizer = args.regularizer
     C = args.C
     mode = args.mode
+    config = args.config
 
     if coarse_targets:
         output_dimension = 3
@@ -114,11 +118,11 @@ def main(args):
             test_dirs = f.read().splitlines()
 
         X_train, _, y_train = get_baseline_datasets(train_dirs, coarse_targets,
-                pre_imputed)
+                pre_imputed, config=config)
         X_val, _, y_val = get_baseline_datasets(val_dirs, coarse_targets,
-                pre_imputed)
+                pre_imputed, config=config)
         X_test, _, y_test = get_baseline_datasets(test_dirs, coarse_targets,
-                pre_imputed)
+                pre_imputed, config=config)
 
         if not pre_imputed:
             print('=> Imputing missing data')

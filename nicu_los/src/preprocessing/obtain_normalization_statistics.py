@@ -26,6 +26,8 @@ def parse_cl_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('-trp', '--train-path', type=str, default='data/train',
             help='Path to the train directories.')
+    parser.add_argument('-c', '--config', type=str,
+            default='nicu_los/config.json', help='Path to the config file')
 
     return parser.parse_args(argv[1:])
 
@@ -56,16 +58,17 @@ def get_normalization_stats_for_var(variable, train_dirs, config, q):
     q.put((variable, np.mean(values), np.std(values)))
 
 
-def listener(config, q):
+def listener(config, config_f, q):
     """Listener function to ensure safe writing to config file
     
     Args:
-        config (dict): Configuration file
+        config (dict): Configuration 
+        config_f (str): Path to the onfiguration file
         q (mp.Manager.Queue): Multiprocessing queue manager
         
     Writes the updated config to file
     """
-    with open('nicu_los/config.json', 'w') as f:
+    with open(config_f, 'w') as f:
         while True:
             m = q.get()
 
@@ -80,8 +83,9 @@ def listener(config, q):
 
 def main(args):
     train_dirs = get_subject_dirs(args.train_path)
+    config_f = args.config
 
-    with open('nicu_los/config.json', 'r') as f:
+    with open(config_f, 'r') as f:
         config = json.load(f)
         variables = config['variables']
 

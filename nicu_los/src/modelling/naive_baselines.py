@@ -39,6 +39,9 @@ def parse_cl_args():
     parser.add_argument('--fine-targets', dest='coarse_targets',
             action='store_false')
 
+    parser.add_argument('-c', '--config', type=str,
+            default='nicu_los/config.json', help='Path to the config file')
+
     parser.set_defaults(coarse_targets=True)
 
     return parser.parse_args(argv[1:])
@@ -52,6 +55,7 @@ def main(args):
     model_name = args.model_name
     model_task = args.model_task
     coarse_targets = args.coarse_targets
+    config = args.config
 
     with open(f'{data_path}/training_subjects.txt', 'r') as f:
         train_dirs = f.read().splitlines()
@@ -63,18 +67,18 @@ def main(args):
     print(f'=> Naive model: {model_name}')
     if model_task == 'classification':
         _, _, y_train = get_baseline_datasets(train_dirs, coarse_targets,
-                targets_only=True)
+                targets_only=True, config=config)
         _, _, y_val = get_baseline_datasets(val_dirs, coarse_targets,
-                targets_only=True)
+                targets_only=True, config=config)
         _, _, y_test = get_baseline_datasets(test_dirs, coarse_targets,
-                targets_only=True)
+                targets_only=True, config=config)
     elif model_task == 'regression':
         _, y_train, _ = get_baseline_datasets(train_dirs, coarse_targets,
-                targets_only=True)
+                targets_only=True, config=config)
         _, y_val, _ = get_baseline_datasets(val_dirs, coarse_targets,
-                targets_only=True)
+                targets_only=True, config=config)
         _, y_test, _ = get_baseline_datasets(test_dirs, coarse_targets,
-                targets_only=True)
+                targets_only=True, config=config)
     else:
         raise ValueError("Parameter 'model_task' must be one of " +
                 "'classification' or 'regression'")
