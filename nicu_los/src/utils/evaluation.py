@@ -104,15 +104,13 @@ def evaluate_regression_model(y_true, y_pred, verbose=True):
     mae = mean_absolute_error(y_true, y_pred)
     mse = mean_squared_error(y_true, y_pred)
     rmse = np.sqrt(mse)
-    mape = mean_absolute_perc_error(y_true, y_pred)
 
     if verbose:
         print(f'=> Mean Absolute Error (MAE): {mae}')
         print(f'=> Mean Squared Error (MSE): {mse}')
         print(f'=> Root Mean Squared Error (RMSE): {rmse}')
-        print(f'=> Mean Aboslute Perentage Error (MAPE): {mape}')
 
-    metrics = {'mae': mae, 'mse': mse, 'rmse': rmse, 'mape': mape}
+    metrics = {'mae': mae, 'mse': mse, 'rmse': rmse}
 
     return metrics
 
