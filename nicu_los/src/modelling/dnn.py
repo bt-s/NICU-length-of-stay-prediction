@@ -38,7 +38,7 @@ def parse_cl_args():
     parser.add_argument('--data-path', type=str, default='data',
             help='Path to the data directories.')
     parser.add_argument( '--model-path', type=str,
-            default='models/rnn',
+            default='models/dnn',
             help='Path to the directory where the model should be saved.')
     parser.add_argument('--model-name', type=str, default='',
             help='The name of the model to be saved.')
@@ -359,8 +359,7 @@ def main(args):
             raise FileNotFoundError("File note found: make sure to predict " +
                     "first.")
 
-        results_dir = os.path.join(model_path, 'results', f'results-' +
-                checkpoint_file)
+        results_dir = os.path.join(model_path, 'results', checkpoint_file)
         if not os.path.exists(results_dir):
             os.makedirs(results_dir)
         f_name_results = os.path.join(results_dir, f'results.json')

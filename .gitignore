@@ -130,6 +130,7 @@ dmypy.json
 
 *.ipynb
 /data/
+/data_old/
 subjects.txt
 *csv
 output*
@@ -139,6 +140,7 @@ output*
 conda-env/
 .conda*
 /models/
+/models_old/
 .idea
 *.swp
 *.swn
@@ -147,3 +149,4 @@ conda-env/
 /cnn-test
 mycert.pem
 /scripts/test_scripts/
+/scripts/scripts_old/
