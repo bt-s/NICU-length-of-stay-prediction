@@ -24,7 +24,8 @@ from tensorflow.keras.callbacks import CSVLogger, EarlyStopping, \
         LearningRateScheduler, ModelCheckpoint, TensorBoard
 
 from nicu_los.src.utils.modelling import construct_and_compile_model, \
-        create_list_file, data_generator, MetricsCallback
+        MetricsCallback
+from nicu_los.src.utils.data_helpers import create_list_file, data_generator
 from nicu_los.src.utils.evaluation import calculate_metric, \
         calculate_mean_absolute_error, calculate_confusion_matrix
 from nicu_los.src.utils.visualization import plot_confusion_matrix 
@@ -43,7 +44,8 @@ def parse_cl_args():
     parser.add_argument('--model-name', type=str, default='',
             help='The name of the model to be saved.')
     parser.add_argument('--model-type', type=str, default='lstm',
-            help='The model to be loaded. Either "lstm" or "gru".')
+            help='The model to be loaded: "lstm", "lstm_cw", "gru", ' \
+                    '"gru_cw", ΅fcn", or "fcn_lstm".')
 
     parser.add_argument('--checkpoint-file', type=str, default="",
             help='File from which to load the model weights.')
