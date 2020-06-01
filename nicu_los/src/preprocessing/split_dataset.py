@@ -68,15 +68,29 @@ def split_data_set(data_dirs_path, split_perc=20):
     subjects = np.zeros(len(data_dirs))
     for i, sd in enumerate(data_dirs):
         df_ts = pd.read_csv(os.path.join(sd, 'timeseries.csv'))
-        targets[i] = df_ts.TARGET_FINE.iloc[0]
+        targets[i] = df_ts.LOS_HOURS.iloc[0]
         subject_id = [int(s) for s in sd.split('/') if s.isdigit()][-1]
         subjects[i] = subject_id
+
+    # Define the bins for splitting
+    sorted_targets = np.sort(targets)
+    bins = [0]
+    set_check = set()
+    for t in np.sort(targets):
+        set_check.add(t)
+        if len(set_check) > 4:
+            bins.append(t)
+            set_check = set()
+    bins.append(max(targets)+1)
+
+    # Bin the targets
+    targets_binned = np.digitize(targets, bins)
 
     # Split the subjects list into a list of x-subjects and a
     # list of y-subjects, in a stratified manner
     subjects_y, subjects_x, _, _ = train_test_split(
             subjects, targets, test_size=split_perc/100, random_state=42,
-            stratify=targets, shuffle=True)
+            stratify=targets_binned, shuffle=True)
 
     x_dirs = [f'{data_dirs_path}/{int(i)}' for i in subjects_x]
     y_dirs = [f'{data_dirs_path}/{int(i)}' for i in subjects_y]
