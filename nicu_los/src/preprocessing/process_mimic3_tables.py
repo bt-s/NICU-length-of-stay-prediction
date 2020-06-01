@@ -20,7 +20,7 @@ import pandas as pd
 from tqdm import tqdm
 from word2number import w2n
 
-from nicu_los.src.utils.mimic_readers import MimicNICUReaders
+from nicu_los.src.utils.readers import MimicNICUReaders
 from nicu_los.src.utils.reg_exps import reg_exps
 from nicu_los.src.utils.utils import get_subject_dirs, remove_subject_dir
 
@@ -29,7 +29,7 @@ def parse_cl_args():
     """Parses CL arguments"""
     parser = argparse.ArgumentParser(
             description='Extract data from the MIMIC-III CSVs.')
-    parser.add_argument('-ip', '--input-path', type=str, default='../../mimic',
+    parser.add_argument('-ip', '--input-path', type=str, default='../mimic',
             help='Path to MIMIC-III CSV files.')
     parser.add_argument('-op', '--output-path', type=str, default='data',
             help='Path to desired output directory.')
