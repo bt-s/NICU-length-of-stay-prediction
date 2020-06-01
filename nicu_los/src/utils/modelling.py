@@ -110,25 +110,28 @@ def construct_fcn(input_dimension, output_dimension, hid_dimension_lstm=8,
     """
 
     inputs = Input(shape=(None, input_dimension))
+    mask = Masking().compute_mask(inputs)
 
     X = Conv1D(128, 8, padding='same',
             kernel_initializer='he_uniform')(inputs)
     X = Activation('relu')(X)
     X = BatchNormalization()(X)
     X = SpatialDropout1D(0.5)(X)
-    X = squeeze_excite_block(X)
+    X = ApplyMask()(X, mask)
+    X = squeeze_excite_block(X, mask)
 
     X = Conv1D(256, 5, padding='same', kernel_initializer='he_uniform')(X)
     X = Activation('relu')(X)
     X = BatchNormalization()(X)
     X = SpatialDropout1D(0.5)(X)
-    X = squeeze_excite_block(X)
+    X = ApplyMask()(X, mask)
+    X = squeeze_excite_block(X, mask)
 
     X = Conv1D(128, 3, padding='same', kernel_initializer='he_uniform')(X)
     X = Activation('relu')(X)
     X = BatchNormalization()(X)
 
-    X = GlobalAveragePooling1D()(X)
+    X = GlobalAveragePooling1D()(X, mask)
 
     if output_dimension != 1:
         # Classification
