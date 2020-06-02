@@ -92,7 +92,7 @@ def construct_rnn(input_dimension, output_dimension, model_type='lstm',
     return model
 
 
-def construct_fcn(input_dimension, output_dimension, hid_dimension_lstm=8,
+def construct_fcn(input_dimension, output_dimension, dropout=0.5,
         model_name=""):
     """Construct an FCN model for multivariate time series classification
     
@@ -101,8 +101,7 @@ def construct_fcn(input_dimension, output_dimension, hid_dimension_lstm=8,
     Args:
         input_dimension (int): Input dimension of the model
         output_dimension (int): Output dimension of the model
-        hid_dimension (int): Dimension of the hidden layer (i.e. # of unit in
-                             the RNN cell)
+        dropout (float): Amount of dropout to apply
         model_name (str): Name of the model
 
     Returns:
@@ -116,14 +115,14 @@ def construct_fcn(input_dimension, output_dimension, hid_dimension_lstm=8,
             kernel_initializer='he_uniform')(inputs)
     X = Activation('relu')(X)
     X = BatchNormalization()(X)
-    X = SpatialDropout1D(0.5)(X)
+    X = SpatialDropout1D(dropout)(X)
     X = ApplyMask()(X, mask)
     X = squeeze_excite_block(X, mask)
 
     X = Conv1D(256, 5, padding='same', kernel_initializer='he_uniform')(X)
     X = Activation('relu')(X)
     X = BatchNormalization()(X)
-    X = SpatialDropout1D(0.5)(X)
+    X = SpatialDropout1D(dropout)(X)
     X = ApplyMask()(X, mask)
     X = squeeze_excite_block(X, mask)
 
