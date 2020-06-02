@@ -22,7 +22,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import GridSearchCV, PredefinedSplit
 from sklearn.metrics import make_scorer, cohen_kappa_score
 
-from nicu_los.src.utils.modelling import get_baseline_datasets
+from nicu_los.src.utils.data_helpers import get_baseline_datasets
 from nicu_los.src.utils.evaluation import calculate_metric, \
         calculate_confusion_matrix, evaluate_classification_model
 from nicu_los.src.utils.visualization import plot_confusion_matrix 
@@ -206,11 +206,7 @@ def main(args):
             f_name = os.path.join(model_path, f'results_{model_name}.txt')
 
             with open(f_name, "a") as f:
-                if grid_search:
-                    f.write(f'Best LR model: {clf.best_estimator_}:\n')
-                else:
-                    f.write(f'Best LR model: {clf.get_params}:\n')
-
+                f.write(f'Best LR model: {clf.get_params}:\n')
                 f.write(f'- Training scores:\n')
                 for k, v in train_scores.items():
                     f.write(f'\t\t{k}: {v}\n')
