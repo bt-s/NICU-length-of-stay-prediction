@@ -243,8 +243,8 @@ def construct_lstm_fcn_original(input_dimension, output_dimension, dropout=0.8,
     return model
 
 
-def construct_lstm_fcn(input_dimension, output_dimension, dropout=0.8,
-        hid_dimension_lstm=8, model_name=""):
+def construct_lstm_fcn(input_dimension, output_dimension, dropout=0.5,
+        hid_dimension_lstm=16, model_name=""):
     """Construct a (modified) LSTM-FCN model 
     
     Modified architecture:
@@ -262,8 +262,9 @@ def construct_lstm_fcn(input_dimension, output_dimension, dropout=0.8,
     Returns:
         model (tf.keras.Model): Constructed LSTM-FCN model
     """
-
     inputs = Input(shape=(None, input_dimension))
+
+    mask = Masking().compute_mask(inputs)
 
     X1 = Masking()(inputs)
     X1 = LSTM(hid_dimension_lstm)(X1)
@@ -273,20 +274,22 @@ def construct_lstm_fcn(input_dimension, output_dimension, dropout=0.8,
             kernel_initializer='he_uniform')(inputs)
     X2 = Activation('relu')(X2)
     X2 = BatchNormalization()(X2)
-    X2 = SpatialDropout1D(0.5)(X2)
-    X2 = squeeze_excite_block(X2)
+    X2 = SpatialDropout1D(0.3)(X2)
+    X2 = ApplyMask()(X2, mask)
+    X2 = squeeze_excite_block(X2, mask)
 
     X2 = Conv1D(256, 5, padding='same', kernel_initializer='he_uniform')(X2)
     X2 = Activation('relu')(X2)
     X2 = BatchNormalization()(X2)
-    X2 = SpatialDropout1D(0.5)(X2)
-    X2 = squeeze_excite_block(X2)
+    X2 = SpatialDropout1D(0.3)(X2)
+    X2 = ApplyMask()(X2, mask)
+    X2 = squeeze_excite_block(X2, mask)
 
     X2 = Conv1D(128, 3, padding='same', kernel_initializer='he_uniform')(X2)
     X2 = Activation('relu')(X2)
     X2 = BatchNormalization()(X2)
 
-    X2 = GlobalAveragePooling1D()(X2)
+    X2 = GlobalAveragePooling1D()(X2, mask)
 
     X = concatenate([X1, X2])
 
@@ -413,7 +416,7 @@ def construct_and_compile_model(model_type, model_name, task, checkpoint_file,
                 model_type, dropout, global_dropout, hid_dimension, multiplier,
                 model_name)
     elif model_type == 'fcn':
-        model = construct_fcn(input_dimension, output_dimension, hid_dimension,
+        model = construct_fcn(input_dimension, output_dimension, dropout,
                 model_name)
     elif model_type == 'lstm_fcn':
         model = construct_lstm_fcn(input_dimension, output_dimension, dropout,
