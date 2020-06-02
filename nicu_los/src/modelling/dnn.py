@@ -122,9 +122,13 @@ def parse_cl_args():
     parser.add_argument('-c', '--config', type=str,
             default='nicu_los/config.json', help='Path to the config file')
 
+    parser.add_argument('--debug-mode', dest='debug_mode',
+            action='store_true')
+
     parser.set_defaults(enable_gpu=False, mode='training', coarse_targets=True,
             mask_indicator=True, metrics_callback=False, task='classification',
-            allow_growth=False, gestational_age=True, lr_scheduler=False)
+            allow_growth=False, gestational_age=True, lr_scheduler=False,
+            debug_mode=False)
 
     return parser.parse_args(argv[1:])
 
@@ -144,6 +148,7 @@ def main(args):
     training_steps = args.training_steps
     validation_steps = args.validation_steps
     config = args.config
+    debug_mode = args.debug_mode
 
     if args.enable_gpu:
         print('=> Using GPU(s)')
@@ -180,20 +185,31 @@ def main(args):
 
     model_path = args.model_path
     if not os.path.exists(model_path):
-        os.makedirs(model_path)
+            os.makedirs(model_path)
 
-    checkpoints_dir = os.path.join(model_path, 'checkpoints')
+    if not debug_mode:
+        checkpoints_dir = os.path.join(model_path, 'checkpoints')
+    else:
+        checkpoints_dir = os.path.join(model_path, 'debug' , 'checkpoints')
     if not os.path.exists(checkpoints_dir):
         os.makedirs(checkpoints_dir)
 
     if mode == 'training':
-        log_dir = os.path.join(model_path, 'logs', model_name + \
-                f'-batch{batch_size}-steps{training_steps}')
+        if not debug_mode:
+            log_dir = os.path.join(model_path, 'logs', model_name + \
+                    f'-batch{batch_size}-steps{training_steps}')
+        else:
+            log_dir = os.path.join(model_path, 'debug', 'logs', model_name + \
+                    f'-batch{batch_size}-steps{training_steps}')
         if not os.path.exists(log_dir):
             os.makedirs(log_dir)
 
-        log_dir_tb = os.path.join(log_dir,
-                datetime.now().strftime('%Y%m%d-%H%M%S'))
+        if not debug_mode:
+            log_dir_tb = os.path.join(log_dir,
+                    datetime.now().strftime('%Y%m%d-%H%M%S'))
+        else:
+            log_dir_tb = os.path.join(log_dir, 'debug',
+                    datetime.now().strftime('%Y%m%d-%H%M%S'))
         if not os.path.exists(log_dir_tb):
             os.makedirs(log_dir_tb)
 
@@ -256,8 +272,8 @@ def main(args):
         val_data_generator = data_generator(val_reader, validation_steps,
                 batch_size, task)
 
-        train_data = tf.data.Dataset.from_generator(lambda: train_data_generator,
-                output_types=(tf.float32, tf.int16),
+        train_data = tf.data.Dataset.from_generator(lambda: 
+                train_data_generator, output_types=(tf.float32, tf.int16),
                 output_shapes=((batch_size, None, len(variables)),
                     (batch_size,)))
 
@@ -273,9 +289,11 @@ def main(args):
         checkpoint_callback = ModelCheckpoint(checkpoint_path)
         tensorboard_callback = tf.keras.callbacks.TensorBoard(
                 log_dir=log_dir_tb, histogram_freq=1)
-        logger_callback = CSVLogger(os.path.join(log_dir, 'logs.csv'))
+        logger_callback = CSVLogger(os.path.join(log_dir, 'logs.csv'),
+                append=True)
 
-        callbacks = [checkpoint_callback, logger_callback, tensorboard_callback]
+        callbacks = [checkpoint_callback, logger_callback,
+                tensorboard_callback]
 
         if args.metrics_callback:
             metrics_callback = MetricsCallback(model, task, train_data,
@@ -307,7 +325,12 @@ def main(args):
             validation_steps=validation_steps, callbacks=callbacks)
 
     elif mode == 'prediction': 
-        predictions_dir = os.path.join(model_path, 'predictions', checkpoint_file)
+        if not debug_mode:
+            predictions_dir = os.path.join(model_path, 'predictions',
+                    checkpoint_file)
+        else:
+            predictions_dir = os.path.join(model_path, 'debug', 'predictions',
+                    checkpoint_file)
         if not os.path.exists(predictions_dir):
             os.makedirs(predictions_dir)
         f_name_predictions = os.path.join(predictions_dir, f'predictions.csv')
@@ -325,8 +348,8 @@ def main(args):
         total_n_steps = n_seqs//batch_size
 
         # steps = None signifies read all
-        test_data_generator = data_generator(test_reader, None, batch_size, task,
-                shuffle=False)
+        test_data_generator = data_generator(test_reader, None, batch_size,
+                task, shuffle=False)
 
         test_data = tf.data.Dataset.from_generator(lambda: test_data_generator,
                 output_types=(tf.float32, tf.int16),
@@ -355,13 +378,22 @@ def main(args):
             writer.writerows(zip(y_true, y_pred))
 
     elif mode == 'evaluation': 
-        f_name_predictions = os.path.join(model_path, 'predictions',
-                checkpoint_file, 'predictions.csv')
+        if not debug_mode:
+            f_name_predictions = os.path.join(model_path, 'predictions',
+                    checkpoint_file, 'predictions.csv')
+        else:
+            f_name_predictions = os.path.join(model_path, 'debug',
+                    'predictions', checkpoint_file, 'predictions.csv')
         if not os.path.exists(f_name_predictions):
-            raise FileNotFoundError("File note found: make sure to predict " +
-                    "first.")
+            raise FileNotFoundError(f"File note found: could not find " +
+                    f"{f_name_predictions} make sure to predict first.")
 
-        results_dir = os.path.join(model_path, 'results', checkpoint_file)
+        if not debug_mode:
+            results_dir = os.path.join(model_path, 'results',
+                    checkpoint_file)
+        else:
+            results_dir = os.path.join(model_path, 'debug', 'results',
+                    checkpoint_file)
         if not os.path.exists(results_dir):
             os.makedirs(results_dir)
         f_name_results = os.path.join(results_dir, f'results.json')
@@ -415,7 +447,8 @@ def main(args):
             cm_normalized = calculate_confusion_matrix(y_true, y_pred,
                     normalize='pred')
         
-            plot_confusion_matrix(cm, output_dimension, f_name_confusion_matrix)
+            plot_confusion_matrix(cm, output_dimension,
+                    f_name_confusion_matrix)
             plot_confusion_matrix(cm_normalized, output_dimension, 
                     f_name_confusion_matrix_normalized)
 
