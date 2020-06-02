@@ -144,8 +144,7 @@ def construct_fcn(input_dimension, output_dimension, dropout=0.5,
     return model
 
 
-def construct_fcn_originial(input_dimension, output_dimension,
-        hid_dimension_lstm=8, model_name=""):
+def construct_fcn_originial(input_dimension, output_dimension, model_name=""):
     """Construct an FCN model for multivariate time series classification
     
     (Karim et al. 2019 - Multivariate LSTM-FCNs for time series classification)
@@ -153,8 +152,6 @@ def construct_fcn_originial(input_dimension, output_dimension,
     Args:
         input_dimension (int): Input dimension of the model
         output_dimension (int): Output dimension of the model
-        hid_dimension (int): Dimension of the hidden layer (i.e. # of unit in
-                             the RNN cell)
         model_name (str): Name of the model
 
     Returns:
@@ -167,12 +164,10 @@ def construct_fcn_originial(input_dimension, output_dimension,
            kernel_initializer='he_uniform')(inputs)
     X = BatchNormalization()(X2)
     X = Activation('relu')(X2)
-    X = squeeze_excite_block(X2)
 
     X = Conv1D(256, 5, padding='same', kernel_initializer='he_uniform')(X2)
     X = BatchNormalization()(X2)
     X = Activation('relu')(X2)
-    X = squeeze_excite_block(X2)
 
     X = Conv1D(128, 3, padding='same', kernel_initializer='he_uniform')(X2)
     X = BatchNormalization()(X2)
