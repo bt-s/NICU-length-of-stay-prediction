@@ -20,7 +20,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler
 
-from nicu_los.src.utils.modelling import get_baseline_datasets
+from nicu_los.src.utils.data_helpers import get_baseline_datasets
 from nicu_los.src.utils.evaluation import calculate_metric, \
         evaluate_regression_model
 
