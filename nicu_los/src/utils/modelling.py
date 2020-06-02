@@ -54,11 +54,11 @@ def construct_rnn(input_dimension, output_dimension, model_type='lstm',
 
         if model_type == 'lstm':
             cell = LSTM(units=num_hid_units, activation='tanh',
-                    return_sequences=True, recurrent_dropout=dropout,
+                    return_sequences=True, recurrent_dropout=0.0,
                     dropout=dropout)
         elif model_type == 'gru':
             cell = GRU(units=num_hid_units, activation='tanh',
-                    return_sequences=True, recurrent_dropout=dropout,
+                    return_sequences=True, recurrent_dropout=0.0,
                     dropout=dropout)
         else:
             raise ValueError("Parameter 'model_type' should be one of " +
@@ -68,10 +68,10 @@ def construct_rnn(input_dimension, output_dimension, model_type='lstm',
 
     # There always has to be at least one cell
     if model_type == 'lstm':
-        X = LSTM(activation='tanh', dropout=dropout, recurrent_dropout=dropout,
+        X = LSTM(activation='tanh', dropout=dropout, recurrent_dropout=0.0,
                 return_sequences=False, units=hid_dimension)(X)
     elif model_type == 'gru':
-        X = GRU(activation='tanh', dropout=dropout, recurrent_dropout=dropout,
+        X = GRU(activation='tanh', dropout=dropout, recurrent_dropout=0.0,
                 return_sequences=False, units=hid_dimension)(X)
     else:
         raise ValueError("Parameter 'model_type' should be one of " +
@@ -328,31 +328,34 @@ def construct_channel_wise_rnn(input_dimension, output_dimension,
     inputs = Input(shape=(None, input_dimension))
 
     # Skip timestep if all  values of the input tensor are 0
+    mask = Masking().compute_mask(inputs)
     X = Masking()(inputs)
 
     # Train LSTMs over the channels, and append them
     cXs = []
     for feature in range(int(input_dimension/2)):
-        mask = int(feature+input_dimension/2)
-        channel_slice = Slice(feature, mask)(X)
+        mask_var = int(feature+input_dimension/2)
+        channel_slice = Slice(feature, mask_var)(X)
 
         num_hid_units = hid_dimension // 2
 
         cell = LSTM(units=num_hid_units, activation='tanh',
                 return_sequences=True, recurrent_dropout=dropout,
                 dropout=dropout)
-
-        cXs.append(Bidirectional(cell)(channel_slice))
+        cX = Bidirectional(cell)(channel_slice)
+        cX = ApplyMask()(cX, mask)
+        cXs.append(cX)
 
     # Concatenate the channels
     X = concatenate(cXs, axis=2)
+    X = Masking()(X)
 
     # There always has to be at least one cell
     if model_type == 'lstm_cw':
-        X = LSTM(activation='tanh', dropout=dropout, recurrent_dropout=0.2,
+        X = LSTM(activation='tanh', dropout=dropout, recurrent_dropout=0.0,
                 return_sequences=False, units=multiplier*hid_dimension)(X)
     elif model_type == 'gru_cw':
-        X = GRU(activation='tanh', dropout=dropout, recurrent_dropout=0.2,
+        X = GRU(activation='tanh', dropout=dropout, recurrent_dropout=0.0,
                 return_sequences=False, units=multiplier*hid_dimension)(X)
     else:
         raise ValueError("Parameter 'model_type' should be one of " +
