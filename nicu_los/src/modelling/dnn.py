@@ -112,7 +112,8 @@ def parse_cl_args():
     parser.add_argument('--regression', dest='task', action='store_const',
             const='regression')
 
-    parser.add_argument('--lr-scheduler', dest='lr_scheduler', action='store_true',
+    parser.add_argument('--lr-scheduler',
+            dest='lr_scheduler', action='store_true',
             help='Whether to use the learning rate scheduler.')
 
     parser.add_argument('--K', type=int, default=1000, help=('How often to ' +
@@ -149,6 +150,9 @@ def main(args):
     validation_steps = args.validation_steps
     config = args.config
     debug_mode = args.debug_mode
+
+    if debug_mode:
+        print("==> DEBUG MODE")
 
     if args.enable_gpu:
         print('=> Using GPU(s)')
@@ -238,13 +242,14 @@ def main(args):
         'multiplier': args.multiplier,
         'n_cells': args.n_cells}
 
-    if args.enable_gpu:
-        with strategy.scope():
+    if mode == 'training' or mode == 'prediction':
+        if args.enable_gpu:
+            with strategy.scope():
+                model = construct_and_compile_model(model_type, model_name,
+                        task, checkpoint_file, checkpoints_dir, model_params)
+        else:
             model = construct_and_compile_model(model_type, model_name, task,
                     checkpoint_file, checkpoints_dir, model_params)
-    else:
-        model = construct_and_compile_model(model_type, model_name, task,
-                checkpoint_file, checkpoints_dir, model_params)
 
     if mode == 'training':
         train_list_file = os.path.join(data_path, 'train_list.txt')
