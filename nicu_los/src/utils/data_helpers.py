@@ -199,9 +199,10 @@ def get_optimal_bucket_boundaries(n=100):
     rows = []
     for _, r in data:
         rows.append(r)
+    rows = sorted(rows)
 
     bucket_boundaries = []
-    for i in range(100):
+    for i in range(n):
         bucket_boundaries.append(rows[len(rows)//100*i])
 
     return bucket_boundaries
