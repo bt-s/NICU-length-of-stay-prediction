@@ -166,9 +166,12 @@ def get_baseline_datasets(subject_dirs, coarse_targets=False, pre_imputed=False,
         y[cnt_old:cnt] = yy
         t[cnt_old:cnt] = tt
 
-    X, y, t = shuffle(X, y, t)
-
-    return X, y, t
+    if not targets_only:
+        X, y, t = shuffle(X, y, t)
+        return X, y, t
+    else:
+        y, t = shuffle(y, t)
+        return y, t
 
 
 def get_optimal_bucket_boundaries(n=100):

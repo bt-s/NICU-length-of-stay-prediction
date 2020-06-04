@@ -16,7 +16,7 @@ import numpy as np
 from sys import argv
 from datetime import datetime
 
-from nicu_los.src.utils.modelling import get_baseline_datasets
+from nicu_los.src.utils.data_helpers import get_baseline_datasets
 from nicu_los.src.utils.evaluation import evaluate_classification_model, \
         evaluate_regression_model
 
@@ -66,18 +66,18 @@ def main(args):
 
     print(f'=> Naive model: {model_name}')
     if model_task == 'classification':
-        _, _, y_train = get_baseline_datasets(train_dirs, coarse_targets,
+        _, y_train = get_baseline_datasets(train_dirs, coarse_targets,
                 targets_only=True, config=config)
-        _, _, y_val = get_baseline_datasets(val_dirs, coarse_targets,
-                targets_only=True, config=config)
-        _, _, y_test = get_baseline_datasets(test_dirs, coarse_targets,
-                targets_only=True, config=config)
+        _, y_val = get_baseline_datasets(val_dirs, coarse_targets,
+             targets_only=True, config=config)
+        _, y_test = get_baseline_datasets(test_dirs, coarse_targets,
+             targets_only=True, config=config)
     elif model_task == 'regression':
-        _, y_train, _ = get_baseline_datasets(train_dirs, coarse_targets,
-                targets_only=True, config=config)
-        _, y_val, _ = get_baseline_datasets(val_dirs, coarse_targets,
-                targets_only=True, config=config)
-        _, y_test, _ = get_baseline_datasets(test_dirs, coarse_targets,
+        y_train, _ = get_baseline_datasets(train_dirs, coarse_targets,
+             targets_only=True, config=config)
+        y_val, _ = get_baseline_datasets(val_dirs, coarse_targets,
+             targets_only=True, config=config)
+        y_test, _ = get_baseline_datasets(test_dirs, coarse_targets,
                 targets_only=True, config=config)
     else:
         raise ValueError("Parameter 'model_task' must be one of " +

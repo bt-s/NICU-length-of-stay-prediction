@@ -132,7 +132,6 @@ def parse_cl_args():
     return parser.parse_args(argv[1:])
 
 
-
 def main(args):
     batch_size = args.batch_size
     checkpoint_file = args.checkpoint_file
