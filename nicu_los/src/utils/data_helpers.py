@@ -10,14 +10,11 @@ __author__ = "Bas Straathof"
 import json, os, random
 import numpy as np
 import pandas as pd
-import tensorflow as tf
 
-from tensorflow.keras.preprocessing.sequence import pad_sequences
 from sklearn.utils import shuffle
 from tqdm import tqdm
 
 from nicu_los.src.utils.utils import get_subject_dirs
-from nicu_los.src.utils.readers import TimeSeriesReader
 
 
 def create_list_file(subject_dirs, list_file_path,
@@ -38,14 +35,21 @@ def create_list_file(subject_dirs, list_file_path,
                 f.write(f'{sd}, {row}\n')
 
 
-def data_generator(reader, steps, batch_size, task, shuffle=True):
+def data_generator(list_file, config='nicu_los/config.json',
+        ts_file='timeseries_normalized.csv', coarse_targets=False,
+        gestational_age=True, mask=True, task='classification',
+        shuffle=True):
     """Data loader function
 
     Args:
-        reader (TimeSeriesReader): Time series reader object
-        steps (int): Number of steps per epoch
-        batch_size (int): Training batch size
-        taks (str): One of 'classification'  and 'regression'
+        list_file (str): Path to the .txt file containing a list of (filename,
+                         sequence length) combinations
+        config (str): Path to the nicu_los config file
+        ts_file (str): Name of the files containing the timeseries
+        coarse_targets (bool): Whether to use coarse targets
+        gestational_age (bool): Whether to use the gestational age variable 
+        mask (bool): Whether to use missingness indicator variables
+        task (str): One of 'classification'  and 'regression'
         shuffle (bool): Whether to shuffle the data
 
     Yields:
@@ -56,49 +60,47 @@ def data_generator(reader, steps, batch_size, task, shuffle=True):
         OR (if task == 'classification'):
             t ():
     """
-    n_examples = reader.get_number_of_sequences()
-    if not steps:
-        steps = (n_examples + batch_size - 1) // batch_size
-        n_examples_epoch = 2048 
-        print(f"\n==> {reader.name} -- number of examples:",
-                n_examples)
-    else:
-        n_examples_epoch = steps * batch_size
-        print(f"\n==> {reader.name} -- number of examples per epoch:",
-                n_examples_epoch)
 
-    # Set a limit on the size of the chunk to be read
-    chunk_size = min(2048, steps) * batch_size
+    with open(list_file, 'r') as f:
+        data = f.readlines()
+    data = [line.split(',') for line in data]
+    data = [(subject_dir, int(row)) for (subject_dir, row) in data]
+
+    with open(config) as f:
+        config = json.load(f)
+
+    variables = config['variables']
+
+    if not gestational_age and "GESTATIONAL_AGE_DAYS" in variables:
+        variables.remove("GESTATIONAL_AGE_DAYS")
+
+    if mask:
+        variables = variables + ['mask_' + v for v in variables]
+    
+    if shuffle:
+        random.shuffle(data)
 
     while True:
-        # Shuffle once per training round
         if shuffle:
-            if (reader.current_index == 0) or (reader.current_index >
-                batch_size*steps):
-                reader.random_shuffle()
-                reader.current_index = 0 
+            random.shuffle(data)
 
-        n_examples_remaining = n_examples_epoch
-        while n_examples_remaining > 0:
-            current_size = min(chunk_size, n_examples_remaining)
-            n_examples_remaining -= current_size
+        index = 0
+        while index < len(data)-1:
+            sd, row = data[index][0], data[index][1]
+            index += 1
+            ts = pd.read_csv(os.path.join(sd, ts_file))[:row]
+            X = ts[variables].to_numpy()
+            y = ts.LOS_HOURS.iloc[-1]
 
-            data = reader.read_chunk(current_size)
-
-            if batch_size > 1:
-                (Xs, ys, ts) = sort_and_batch_shuffle(data, batch_size)
+            if coarse_targets:
+                t = ts.TARGET_COARSE.iloc[-1]
             else:
-                Xs, ys, ts = data['X'], data['y'], data['t']
+                t = ts.TARGET_FINE.iloc[-1]
 
-            for i in range(0, current_size, batch_size):
-                X = zero_pad_timeseries(Xs[i:i + batch_size])
-                y = ys[i:i+batch_size]
-                t = ts[i:i+batch_size]
-
-                if task == 'regression':
-                    yield X, y
-                else:
-                    yield X, t
+            if task == 'regression':
+                yield (X, y)
+            else:
+                yield (X, t)
 
 
 def get_baseline_datasets(subject_dirs, coarse_targets=False, pre_imputed=False,
@@ -169,56 +171,35 @@ def get_baseline_datasets(subject_dirs, coarse_targets=False, pre_imputed=False,
     return X, y, t
 
 
-def sort_and_batch_shuffle(data, batch_size):
-    """Sort the data set and shuffle the batches
-
+def get_optimal_bucket_boundaries(n=100):
+    """Function to get the optimal bucket boundaries
+    
     Args:
-        data ():
-        batch_size (int):
+        n (int): Number of buckets
 
     Returns:
-        data ():
+        bucket_boundaries (list): Optimal bucket boundaries for n
     """
-    # Unpack Xs, ys, ts
-    Xs = data['X']
-    ys = data['y']
-    ts = data['t']
+    train_list_file = os.path.join('data', 'train_list.txt')
+    val_list_file = os.path.join('data', 'val_list.txt')
+    test_list_file = os.path.join('data', 'test_list.txt')
+    list_files = [train_list_file, val_list_file, test_list_file]
 
-    # Zip the data together
-    data = list(zip(Xs, ys, ts))
+    data = []
+    for list_file in list_files :
+        with open(list_file, 'r') as f:
+            data += f.readlines()
 
-    # Find and drop the remainder
-    remainder = len(data) % batch_size
-    data = data[:len(data)- remainder]
+    data = [line.split(',') for line in data]
+    data = [(subject_dir, int(row)) for (subject_dir, row) in data]
 
-    # Sort the data by length of the time series
-    data.sort(key=(lambda x: x[0].shape[0]))
+    rows = []
+    for _, r in data:
+        rows.append(r)
 
-    # Create batches of time series that are closest in length
-    batches = [data[i: i + batch_size] for i in range(0, len(data),
-        batch_size)]
+    bucket_boundaries = []
+    for i in range(100):
+        bucket_boundaries.append(rows[len(rows)//100*i])
 
-    # Shuffle the batches randomly
-    random.shuffle(batches)
-
-    # Flatten the batches and zip the data together
-    data = [x for batch in batches for x in batch]
-    data = list(zip(*data))
-
-    return data
-
-
-def zero_pad_timeseries(batch):
-    """Zero pads a batch of time series to the length of of the longest
-       series in the batch
-
-    Args:
-        batch (list): Input batch (batch_size, None, channels)
-
-    Returns:
-        batch (list): Padded batch (batch_size, longest_time_dim, channels)
-    """
-    batch = pad_sequences(batch, padding='post')
-
-    return batch
+    return bucket_boundaries
 

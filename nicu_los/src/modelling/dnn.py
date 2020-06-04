@@ -30,8 +30,6 @@ from nicu_los.src.utils.evaluation import calculate_metric, \
         calculate_mean_absolute_error, calculate_confusion_matrix
 from nicu_los.src.utils.visualization import plot_confusion_matrix 
         
-from nicu_los.src.utils.readers import TimeSeriesReader
-
 
 def parse_cl_args():
     """Parses CL arguments"""
@@ -134,6 +132,7 @@ def parse_cl_args():
     return parser.parse_args(argv[1:])
 
 
+
 def main(args):
     batch_size = args.batch_size
     checkpoint_file = args.checkpoint_file
@@ -221,6 +220,8 @@ def main(args):
     with open(config) as f:
         config = json.load(f)
         variables = config['variables']
+        bucket_boundaries = config['bucket_boundaries']
+        bucket_sizes = [batch_size] * (len(bucket_boundaries)+1)
 
         if not gestational_age and "GESTATIONAL_AGE_DAYS" in variables:
             variables.remove("GESTATIONAL_AGE_DAYS")
@@ -264,28 +265,35 @@ def main(args):
                 val_dirs = f.read().splitlines()
                 create_list_file(val_dirs, val_list_file)
 
-        # Instantiate the training and validation readers
-        train_reader = TimeSeriesReader(train_list_file,
+        # Instantiate the training Dataset 
+        train_data_generator = data_generator(train_list_file,
                 coarse_targets=coarse_targets, mask=mask, 
-                gestational_age=gestational_age, name="train_reader")
-        val_reader = TimeSeriesReader(val_list_file,
-                coarse_targets=coarse_targets, mask=mask,
-                gestational_age=gestational_age, name="validation_reader")
-
-        train_data_generator = data_generator(train_reader, training_steps,
-                batch_size, task)
-        val_data_generator = data_generator(val_reader, validation_steps,
-                batch_size, task)
+                gestational_age=gestational_age, task=task)
 
         train_data = tf.data.Dataset.from_generator(lambda: 
                 train_data_generator, output_types=(tf.float32, tf.int16),
-                output_shapes=((batch_size, None, len(variables)),
-                    (batch_size,)))
+                output_shapes=((None, len(variables)), []))
+
+        train_data = train_data.apply(
+            tf.data.experimental.bucket_by_sequence_length(
+                element_length_func=lambda x, y: tf.shape(x)[0],
+                bucket_batch_sizes=bucket_sizes,
+                bucket_boundaries=bucket_boundaries))
+
+        # Instantiate the validation Dataset 
+        val_data_generator = data_generator(val_list_file,
+                coarse_targets=coarse_targets, mask=mask, 
+                gestational_age=gestational_age, task=task)
 
         val_data = tf.data.Dataset.from_generator(lambda: val_data_generator,
                 output_types=(tf.float32, tf.int16),
-                output_shapes=((batch_size, None, len(variables)),
-                    (batch_size,)))
+                output_shapes=((None, len(variables)), []))
+
+        val_data = val_data.apply(
+            tf.data.experimental.bucket_by_sequence_length(
+                element_length_func=lambda x, y: tf.shape(x)[0],
+                bucket_batch_sizes=bucket_sizes,
+                bucket_boundaries=bucket_boundaries))
 
         # Get callbacks
         checkpoint_path = os.path.join(checkpoints_dir, f'{model_name}-' + \
@@ -327,7 +335,8 @@ def main(args):
         print(f'=> Fitting the model')
         model.fit(train_data, validation_data=val_data, epochs=args.epochs,
             initial_epoch=args.initial_epoch, steps_per_epoch=training_steps,
-            validation_steps=validation_steps, callbacks=callbacks)
+            validation_steps=validation_steps, callbacks=callbacks, workers=20,
+            use_multiprocessing=True, max_queue_size=20)
 
     elif mode == 'prediction': 
         if not debug_mode:
@@ -346,20 +355,24 @@ def main(args):
                 test_dirs = f.read().splitlines()
                 create_list_file(test_dirs, test_list_file)
 
-        test_reader = TimeSeriesReader(test_list_file,
-                coarse_targets=coarse_targets, mask=mask,
-                gestational_age=gestational_age, name="test_reader")
-        n_seqs = test_reader.get_number_of_sequences()
-        total_n_steps = n_seqs//batch_size
+        with open(test_list_file, 'r') as f:
+            n_test_seqs = len(f.read().splitlines())
+            total_n_steps = n_test_seqs//batch_size
 
-        # steps = None signifies read all
-        test_data_generator = data_generator(test_reader, None, batch_size,
-                task, shuffle=False)
+        # Instantiate the test Dataset 
+        test_data_generator = data_generator(test_list_file,
+                coarse_targets=coarse_targets, mask=mask, 
+                gestational_age=gestational_age, task=task, shuffle=True)
 
-        test_data = tf.data.Dataset.from_generator(lambda: test_data_generator,
-                output_types=(tf.float32, tf.int16),
-                output_shapes=((batch_size, None, len(variables)),
-                    (batch_size,)))
+        test_data = tf.data.Dataset.from_generator(lambda: 
+                test_data_generator, output_types=(tf.float32, tf.int16),
+                output_shapes=((None, len(variables)), []))
+
+        test_data = test_data.apply(
+            tf.data.experimental.bucket_by_sequence_length(
+                element_length_func=lambda x, y: tf.shape(x)[0],
+                bucket_batch_sizes=bucket_sizes,
+                bucket_boundaries=bucket_boundaries))
 
         y_true, y_pred = [], []
         for batch, (x, y) in enumerate(tqdm(test_data, total=(total_n_steps))):

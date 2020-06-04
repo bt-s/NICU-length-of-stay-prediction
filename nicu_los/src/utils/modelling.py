@@ -18,13 +18,14 @@ from tensorflow.keras.layers import Activation, BatchNormalization, \
         Bidirectional, concatenate, Conv1D, Dense, Dropout, \
         GlobalAveragePooling1D, GRU, Input, LSTM, Masking, \
         SpatialDropout1D
-from tensorflow.keras.losses import MeanAbsoluteError, SparseCategoricalCrossentropy
+from tensorflow.keras.losses import MeanAbsoluteError, \
+        SparseCategoricalCrossentropy
 from tensorflow.keras.optimizers import Adam
 
 from nicu_los.src.utils.evaluation import evaluate_classification_model, \
         evaluate_regression_model
-from nicu_los.src.utils.custom_keras_layers import ApplyMask, squeeze_excite_block, \
-       Slice 
+from nicu_los.src.utils.custom_keras_layers import ApplyMask, \
+        squeeze_excite_block, Slice 
 
 
 def construct_rnn(input_dimension, output_dimension, model_type='lstm',
@@ -35,7 +36,7 @@ def construct_rnn(input_dimension, output_dimension, model_type='lstm',
         input_dimension (int): Input dimension of the model
         output_dimension (int): Output dimension of the model
         n_cells (int): Number of RNN cells
-        dropout (float): Amount of dropout to apply
+        dropout (float): Amount of dropout to apply after each RNN cell 
         hid_dimension (int): Dimension of the hidden layer (i.e. # of unit in
                              the RNN cell)
 
@@ -101,7 +102,8 @@ def construct_fcn(input_dimension, output_dimension, dropout=0.5,
     Args:
         input_dimension (int): Input dimension of the model
         output_dimension (int): Output dimension of the model
-        dropout (float): Amount of dropout to apply
+        dropout (float): Amount of dropout to apply in the first two 
+                         convolutional blocks
         model_name (str): Name of the model
 
     Returns:
@@ -197,7 +199,7 @@ def construct_lstm_fcn_original(input_dimension, output_dimension, dropout=0.8,
     Args:
         input_dimension (int): Input dimension of the model
         output_dimension (int): Output dimension of the model
-        dropout (float): Amount of dropout to apply
+        dropout (float): Amount of dropout to apply after the LSTM cell
         hid_dimension (int): Dimension of the hidden layer (i.e. # of unit in
                              the RNN cell)
         model_name (str): Name of the model
@@ -254,7 +256,7 @@ def construct_lstm_fcn(input_dimension, output_dimension, dropout=0.5,
     Args:
         input_dimension (int): Input dimension of the model
         output_dimension (int): Output dimension of the model
-        dropout (float): Amount of dropout to apply
+        dropout (float): Amount of dropout to apply after the LSTM cell
         hid_dimension (int): Dimension of the hidden layer (i.e. # of unit in
                              the RNN cell)
         model_name (str): Name of the model
@@ -306,18 +308,18 @@ def construct_lstm_fcn(input_dimension, output_dimension, dropout=0.5,
 
 
 def construct_channel_wise_rnn(input_dimension, output_dimension,
-        model_type='lstm_cw', dropout=0.0, global_dropout=0.0,
-        hid_dimension=16, multiplier=4, model_name=""):
+        model_type='lstm_cw', dropout=0.0, global_dropout=0.0, hid_dimension=16,
+        multiplier=4, model_name=""):
     """Construct an RNN model (either LSTM or GRU)
 
     Args:
         input_dimension (int): Input dimension of the model
         output_dimension (int): Output dimension of the model
-        dropout (float): Amount of dropout to apply
-        global_dropout (float): Amount of dropout to apply to the global dropout layer
+        dropout (float): Amount of dropout to apply after each RNN cell 
+        global_dropout (float): Amount of dropout to apply before the output 
         hid_dimension (int): Dimension of the hidden layer (i.e. # of unit in
                              the RNN cell)
-        multiplier (int): Multiplier for the hidden dimension of the global LSTM 
+        multiplier (int): Multiplier for the hidden dimension of the global LSTM
 
     Returns:
         model (tf.keras.Model): Constructed channel-wise RNN model
