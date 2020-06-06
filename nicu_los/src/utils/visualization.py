@@ -106,3 +106,36 @@ def plot_confusion_matrix(cm, labels=3, fname=''):
 
     fig.savefig(fname, format='pdf', bbox_inches='tight', pad_inces=0)
 
+
+def plot_loss_curve(train_loss, val_loss, title="", save=False,
+        fname=""):
+    """Plot the training and validation loss curves
+
+    Args:
+        train_loss (list): Training loss values
+        val_loss (list): Validationloss values
+        title (str): Plot title
+        save (bool): Whether to save the plot
+        fname (str): Filename for saving the plot
+    """
+    assert len(train_loss) == len(val_loss)
+    train_rounds = len(train_loss)
+    plt.figure(1, figsize=(12, 4))
+    plt.plot(range(train_rounds), train_loss, 'tab:blue',
+            label='Training loss')
+    # The validation loss curve should be shifted by 0.5 since it is a running
+    # average
+    plt.plot([x + 0.5 for x in range(train_rounds)], val_loss, 'tab:orange',
+            label='Validation loss')
+    plt.ylabel("Loss", fontsize=14)
+    plt.xlabel("Training rounds", fontsize=14)
+    plt.legend(loc='upper right', fontsize='large')
+    plt.title(title, fontsize=14)
+    plt.xticks(fontsize=11)
+    plt.yticks(fontsize=11)
+
+    if save:
+        plt.savefig(fname, format='pdf', bbox_inches='tight')
+    else:
+        plt.show()
+
