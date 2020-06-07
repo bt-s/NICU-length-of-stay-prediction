@@ -144,12 +144,14 @@ def main(args):
         print(f'=> Coarse targets: {coarse_targets}')
         print(f'=> Grid search: {grid_search}')
 
-        # The training and validation set need to be fed conjointly to GridSearchCV
+        # The training and validation set need to be fed conjointly to
+        # GridSearchCV
         X = np.vstack((X_train, X_val))
         y = np.hstack((y_train, y_val))
 
         # Define what indices of X belong to x_train, and which to x_Val
-        val_idx = np.hstack((np.ones(X_train.shape[0])*-1, np.ones(X_val.shape[0])))
+        val_idx = np.hstack((np.ones(X_train.shape[0])*-1, 
+            np.ones(X_val.shape[0])))
         ps = PredefinedSplit(test_fold=val_idx)
 
         # Define the parameter grid
@@ -160,22 +162,26 @@ def main(args):
 
             regularizers = ['l1', 'l2']
             Cs = [1.0, 0.1, 0.01, 0.001, 0.0001, 0.00001 ]
-            print(f'=> Doing a grid search with the following regularizers and Cs.')
+            print(f'=> Doing a grid search with the following regularizers ' +
+                    'and Cs.')
             print(f'=> Regularizers: {regularizers} .')
             print(f'=> Cs: {Cs} .')
 
             param_grid = dict(C=Cs, penalty=regularizers)
 
-            # Initialize the grid serach using the predefined train-validation split
-            clf = GridSearchCV(LR, param_grid=param_grid, n_jobs=8, cv=ps,
+            # Initialize the grid serach using the predefined train-validation 
+            # split
+            clf = GridSearchCV(LR, param_grid=param_grid, n_jobs=6, cv=ps,
                     scoring=make_scorer(cohen_kappa_score), verbose=3)
 
             # Fit the GridSearchCV to find the optimal estimator
             print(f'=> Fitting the Logistic Regression model')
             clf.fit(X, y)
 
-            # Extract the best estimator and fit again on all available training data
-            print(f'=> Fitting the best Logistic Regression model on all available data')
+            # Extract the best estimator and fit again on all available training
+            # data
+            print(f'=> Fitting the best Logistic Regression model on all ' + 
+                    'available data')
             clf = clf.best_estimator_
             clf.fit(X, y)
         else:

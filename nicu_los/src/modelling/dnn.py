@@ -78,8 +78,6 @@ def parse_cl_args():
             help='The number of cells in the RNN " \
                     " (does not apply to channel-wise RNN).')
 
-    parser.add_argument('--mask-indicatior', dest='mask_indicator',
-            action='store_true')
     parser.add_argument('--no-mask-indicator', dest='mask_indicator',
             action='store_false')
     parser.add_argument('--no-gestational-age', dest='gestational_age',

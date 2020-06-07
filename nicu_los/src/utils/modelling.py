@@ -276,14 +276,14 @@ def construct_lstm_fcn(input_dimension, output_dimension, dropout=0.5,
             kernel_initializer='he_uniform')(inputs)
     X2 = Activation('relu')(X2)
     X2 = BatchNormalization()(X2)
-    X2 = SpatialDropout1D(0.3)(X2)
+    X2 = SpatialDropout1D(0.5)(X2)
     X2 = ApplyMask()(X2, mask)
     X2 = squeeze_excite_block(X2, mask)
 
     X2 = Conv1D(256, 5, padding='same', kernel_initializer='he_uniform')(X2)
     X2 = Activation('relu')(X2)
     X2 = BatchNormalization()(X2)
-    X2 = SpatialDropout1D(0.3)(X2)
+    X2 = SpatialDropout1D(0.5)(X2)
     X2 = ApplyMask()(X2, mask)
     X2 = squeeze_excite_block(X2, mask)
 
