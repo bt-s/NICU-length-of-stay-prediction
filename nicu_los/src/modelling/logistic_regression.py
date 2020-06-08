@@ -177,24 +177,17 @@ def main(args):
             # Fit the GridSearchCV to find the optimal estimator
             print(f'=> Fitting the Logistic Regression model')
             clf.fit(X, y)
-
-            # Extract the best estimator and fit again on all available training
-            # data
-            print(f'=> Fitting the best Logistic Regression model on all ' + 
-                    'available data')
-            clf = clf.best_estimator_
-            clf.fit(X, y)
         else:
             # Initialize the logistic regression estimator
             clf = LogisticRegression(random_state=42, penalty=regularizer, C=C,
                     multi_class="multinomial", solver='saga')
 
             print(f'=> Fitting Logistic Regression model with ' \
-                    'regularizer={regularizer} and C={C}')
-            clf.fit(X, y)
+                    f'regularizer={regularizer} and C={C}')
+            clf.fit(X_train, y_train)
 
         # Predict on the training set
-        train_preds = clf.predict_proba(X)
+        train_preds = clf.predict_proba(X_train)
         train_act = np.argmax(train_preds, axis=1)
 
         # Predict on the testing set
@@ -202,7 +195,7 @@ def main(args):
         test_act = np.argmax(test_preds, axis=1)
 
         print('=> Evaluate fitted model on the training set')
-        train_scores = evaluate_classification_model(y, train_act)
+        train_scores = evaluate_classification_model(y_train, train_act)
 
         print('=> Evaluate fitted model on the test set')
         test_scores = evaluate_classification_model(y_test, test_act)
