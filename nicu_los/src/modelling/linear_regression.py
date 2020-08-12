@@ -47,6 +47,8 @@ def parse_cl_args():
     parser.add_argument('--evaluation', dest='mode', action='store_const',
             const='evaluation')
 
+    parser.add_argument('--friedman', dest='friedman', action='store_true')
+
     parser.add_argument('--K', type=int, default=1000, help=('How often to ' +
         'perform bootstrap sampling without replacement when evaluating ' +
         'the model'))
@@ -54,13 +56,14 @@ def parse_cl_args():
     parser.add_argument('-c', '--config', type=str,
             default='nicu_los/config.json', help='Path to the config file')
 
-    parser.set_defaults(pre_imputed=False, mode='training')
+    parser.set_defaults(pre_imputed=False, mode='training', friedman=False)
 
     return parser.parse_args(argv[1:])
 
 
 def main(args):
     pre_imputed = args.pre_imputed
+    friedman = args.friedman
     data_path = args.subjects_path
     model_name = args.model_name
     model_path = args.model_path
@@ -90,11 +93,11 @@ def main(args):
         with open(f'{data_path}/test_subjects.txt', 'r') as f:
             test_dirs = f.read().splitlines()
 
-        X_train, y_train, _ = get_baseline_datasets(train_dirs,
+        X_train, y_train, _, subjects = get_baseline_datasets(train_dirs,
                 pre_imputed=pre_imputed, config=config)
-        X_val, y_val, _ = get_baseline_datasets(val_dirs, pre_imputed=pre_imputed,
-                config=config)
-        X_test, y_test, _ = get_baseline_datasets(test_dirs,
+        X_val, y_val, _, subjects = get_baseline_datasets(val_dirs,
+                pre_imputed=pre_imputed, config=config)
+        X_test, y_test, _, subjects = get_baseline_datasets(test_dirs,
                 pre_imputed=pre_imputed, config=config)
 
         if not pre_imputed:
@@ -157,7 +160,12 @@ def main(args):
             pickle.dump(clf, f)
 
     elif mode == 'prediction':
-        predictions_dir = os.path.join(model_path, 'predictions', model_name)
+        if friedman:
+            predictions_dir = os.path.join(model_path, 'predictions',
+                    'friedman', model_name)
+        else:
+            predictions_dir = os.path.join(model_path, 'predictions',
+                    model_name)
         if not os.path.exists(predictions_dir):
             os.makedirs(predictions_dir)
         f_name_predictions = os.path.join(predictions_dir, f'predictions.csv')
@@ -173,17 +181,25 @@ def main(args):
         print(f'=> Writing results to {f_name_predictions}')
         with open(f_name_predictions, 'w') as f:
             writer = csv.writer(f)
-            writer.writerow(['True labels', 'Predictions'])
-            writer.writerows(zip(y_test, y_pred))
+            writer.writerow(['Test seqs', 'True labels', 'Predictions'])
+            writer.writerows(zip(subjects, y_test, y_pred))
 
     elif mode == 'evaluation':
-        f_name_predictions = os.path.join(model_path, 'predictions',
-                model_name, 'predictions.csv')
+        if friedman:
+            f_name_predictions = os.path.join(model_path, 'predictions',
+                     model_name, 'predictions.csv')
+        else:
+            f_name_predictions = os.path.join(model_path, 'predictions',
+                    model_name, 'predictions.csv')
         if not os.path.exists(f_name_predictions):
             raise FileNotFoundError("File note found: make sure to predict " +
                     "first.")
 
-        results_dir = os.path.join(model_path, 'results', model_name)
+        if friedman:
+            results_dir = os.path.join(model_path, 'results', 'friedman',
+                    model_name)
+        else:
+            results_dir = os.path.join(model_path, 'results', model_name)
         if not os.path.exists(results_dir):
             os.makedirs(results_dir)
         f_name_results = os.path.join(results_dir, f'results.json')
@@ -195,30 +211,74 @@ def main(args):
         # Open the dataframe containing all predicitons on the test set
         df_pred = pd.read_csv(f_name_predictions, index_col=False)
 
-        print(f'=> K={args.K} bootstrapping rounds')
+        if friedman:
+            f_name_results = os.path.join(results_dir, f'results.csv')
 
-        results = {'iters': args.K, 'MAE': {'iters': []}}
+            test_partitions_file = os.path.join(data_path,
+                    'test_partitions.txt')
+            if not os.path.exists(test_partitions_file):
+                raise FileNotFoundError(f"File note found: could not find " +
+                        f"{test_partitions_file}.")
 
-        for k in tqdm(range(args.K)):
-            y_true = df_pred['True labels'].to_numpy()
-            y_true = resample(y_true, random_state=k)
-            y_pred = df_pred['Predictions'].to_numpy()
-            y_pred = resample(y_pred, random_state=k)
+            with open(test_partitions_file, 'r') as f:
+                partitions = f.read().splitlines()
 
-            results['MAE']['iters'].append(calculate_metric(y_true, y_pred,
-                metric='MAE', verbose=False))
+            metric = 'MAE'
 
-        iters = results['MAE']['iters']
-        results['MAE']['mean'] = np.mean(iters)
-        results['MAE']['median'] = np.median(iters)
-        results['MAE']['std'] = np.std(iters)
-        results['MAE']['2.5 percentile'] = np.percentile(iters, 2.5)
-        results['MAE']['97.5 percentile'] = np.percentile(iters, 97.5)
-        del results['MAE']['iters']
+            results = []
+            for i, p in enumerate(partitions):
+                partition = os.path.join(data_path, p)
+                with open(partition, 'r') as f:
+                    partition = f.read().splitlines()
+                    partition = [p.split(',')[0] for p in partition]
 
-        print(f'=> Writing results to {f_name_results}')
-        with open(f_name_results, 'w') as f:
-            json.dump(results, f)
+                df_partition = df_pred[df_pred['Test seqs'].isin(partition)]
+
+                y_true = df_partition['True labels'].values
+                y_pred = df_partition['Predictions'].values
+
+                perf = calculate_metric(y_true, y_pred, metric=metric,
+                            verbose=True)
+                if pre_imputed:
+                    results.append({'clf': 'LR-pre-imputed', 'partition': i,
+                        'perf': perf})
+                else:
+                    results.append({'clf': 'LR-not-pre-imputed', 'partition': i,
+                        'perf': perf})
+
+            results_df = pd.DataFrame(results)
+            print(results_df)
+
+            print(f'=> Writing results to {f_name_results}')
+            if not os.path.exists(f_name_results):
+                results_df.to_csv(f_name_results)
+            else:
+                results_df.to_csv(f_name_results, mode='a', header=False)
+        else:
+            print(f'=> K={args.K} bootstrapping rounds')
+
+            results = {'iters': args.K, 'MAE': {'iters': []}}
+
+            for k in tqdm(range(args.K)):
+                y_true = df_pred['True labels'].to_numpy()
+                y_true = resample(y_true, random_state=k)
+                y_pred = df_pred['Predictions'].to_numpy()
+                y_pred = resample(y_pred, random_state=k)
+
+                results['MAE']['iters'].append(calculate_metric(y_true, y_pred,
+                    metric='MAE', verbose=False))
+
+            iters = results['MAE']['iters']
+            results['MAE']['mean'] = np.mean(iters)
+            results['MAE']['median'] = np.median(iters)
+            results['MAE']['std'] = np.std(iters)
+            results['MAE']['2.5 percentile'] = np.percentile(iters, 2.5)
+            results['MAE']['97.5 percentile'] = np.percentile(iters, 97.5)
+            del results['MAE']['iters']
+
+            print(f'=> Writing results to {f_name_results}')
+            with open(f_name_results, 'w') as f:
+                json.dump(results, f)
 
 
 if __name__ == '__main__':

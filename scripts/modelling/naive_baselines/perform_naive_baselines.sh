@@ -3,8 +3,10 @@
 mkdir -p logs
 
 python -m nicu_los.src.modelling.naive_baselines --model-task classification \
-  --coarse-targets --model-name naive_baseline_classification_coarse
+  --coarse-targets --model-name naive_baseline_classification_coarse \
+  --friedman
 
 python -m nicu_los.src.modelling.naive_baselines --model-task regression \
-  --model-name naive_baseline_regression
+  --model-name naive_baseline_regression \
+  --friedman
 

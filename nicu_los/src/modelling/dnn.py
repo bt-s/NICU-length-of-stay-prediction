@@ -90,6 +90,8 @@ def parse_cl_args():
     parser.add_argument('--evaluation', dest='mode', action='store_const',
             const='evaluation')
 
+    parser.add_argument('--friedman', dest='friedman', action='store_true')
+
     parser.add_argument('--metrics-callback', dest='metrics_callback',
             action='store_true')
 
@@ -125,7 +127,7 @@ def parse_cl_args():
     parser.set_defaults(enable_gpu=False, mode='training', coarse_targets=True,
             mask_indicator=True, metrics_callback=False, task='classification',
             allow_growth=False, gestational_age=True, lr_scheduler=False,
-            debug_mode=False)
+            debug_mode=False, friedman=False)
 
     return parser.parse_args(argv[1:])
 
@@ -136,6 +138,7 @@ def main(args):
     coarse_targets = args.coarse_targets
     data_path = args.data_path
     early_stopping = args.early_stopping
+    friedman = args.friedman
     gestational_age = args.gestational_age
     mask = args.mask_indicator
     model_name = args.model_name
@@ -240,7 +243,7 @@ def main(args):
         'multiplier': args.multiplier,
         'n_cells': args.n_cells}
 
-    if mode == 'training' or mode == 'prediction':
+    if mode in ['training','prediction']:
         if args.enable_gpu:
             with strategy.scope():
                 model = construct_and_compile_model(model_type, model_name,
@@ -335,12 +338,15 @@ def main(args):
             validation_steps=validation_steps, callbacks=callbacks, workers=20,
             use_multiprocessing=True, max_queue_size=20)
 
-    elif mode == 'prediction': 
-        if not debug_mode:
-            predictions_dir = os.path.join(model_path, 'predictions',
+    elif mode == 'prediction':
+        if friedman:
+            predictions_dir = os.path.join(model_path, 'friedman',
+                    'predictions', checkpoint_file)
+        elif debug_mode:
+            predictions_dir = os.path.join(model_path, 'debug', 'predictions',
                     checkpoint_file)
         else:
-            predictions_dir = os.path.join(model_path, 'debug', 'predictions',
+            predictions_dir = os.path.join(model_path, 'predictions',
                     checkpoint_file)
         if not os.path.exists(predictions_dir):
             os.makedirs(predictions_dir)
@@ -353,13 +359,14 @@ def main(args):
                 create_list_file(test_dirs, test_list_file)
 
         with open(test_list_file, 'r') as f:
-            n_test_seqs = len(f.read().splitlines())
+            test_seqs = f.read().splitlines()
+            n_test_seqs = len(test_seqs)
             total_n_steps = n_test_seqs//batch_size
 
         # Instantiate the test Dataset 
         test_data_generator = data_generator(test_list_file,
                 coarse_targets=coarse_targets, mask=mask, 
-                gestational_age=gestational_age, task=task, shuffle=True)
+                gestational_age=gestational_age, task=task, shuffle=False)
 
         test_data = tf.data.Dataset.from_generator(lambda: 
                 test_data_generator, output_types=(tf.float32, tf.int16),
@@ -389,90 +396,142 @@ def main(args):
         print(f'=> Writing results to {f_name_predictions}')
         with open(f_name_predictions, 'w') as f:
             writer = csv.writer(f)
-            writer.writerow(['True labels', 'Predictions'])
-            writer.writerows(zip(y_true, y_pred))
+            writer.writerow(['Test seqs', 'True labels', 'Predictions'])
+            writer.writerows(zip(test_seqs, y_true, y_pred))
 
     elif mode == 'evaluation': 
-        if not debug_mode:
-            f_name_predictions = os.path.join(model_path, 'predictions',
-                    checkpoint_file, 'predictions.csv')
-        else:
+        if friedman:
+            f_name_predictions = os.path.join(model_path, 'friedman',
+                    'predictions', checkpoint_file, 'predictions.csv')
+        elif debug_mode:
             f_name_predictions = os.path.join(model_path, 'debug',
                     'predictions', checkpoint_file, 'predictions.csv')
+        else:
+            f_name_predictions = os.path.join(model_path, 'predictions',
+                    checkpoint_file, 'predictions.csv')
         if not os.path.exists(f_name_predictions):
             raise FileNotFoundError(f"File note found: could not find " +
                     f"{f_name_predictions} make sure to predict first.")
 
-        if not debug_mode:
-            results_dir = os.path.join(model_path, 'results',
+        if friedman:
+            results_dir = os.path.join(model_path, 'friedman', 'results')
+        elif debug_mode:
+            results_dir = os.path.join(model_path, 'debug', 'results',
                     checkpoint_file)
         else:
-            results_dir = os.path.join(model_path, 'debug', 'results',
+            results_dir = os.path.join(model_path, 'results',
                     checkpoint_file)
         if not os.path.exists(results_dir):
             os.makedirs(results_dir)
-        f_name_results = os.path.join(results_dir, f'results.json')
 
-        if task == 'classification':
-            f_name_confusion_matrix = os.path.join(results_dir, f'cm.pdf')
-            f_name_confusion_matrix_normalized = os.path.join(results_dir,
-                    f'cm_normalized.pdf')
+        if friedman:
+            f_name_results = os.path.join(results_dir, f'results.csv')
 
-        # Open the dataframe containing all predicitons on the test set
-        df_pred = pd.read_csv(f_name_predictions, index_col=False)
+            # Open the dataframe containing all predicitons on the test set
+            df_pred = pd.read_csv(f_name_predictions, index_col=False)
 
-        print(f'=> K={args.K} bootstrapping rounds')
+            test_partitions_file = os.path.join(data_path,
+                    'test_partitions.txt')
+            if not os.path.exists(test_partitions_file):
+                raise FileNotFoundError(f"File note found: could not find " +
+                        f"{test_partitions_file}.")
 
-        if task == 'regression':
-            metrics = ['MAE']
+            with open(test_partitions_file, 'r') as f:
+                partitions = f.read().splitlines()
+
+            results = []
+            for i, p in enumerate(partitions):
+                partition = os.path.join(data_path, p)
+                with open(partition, 'r') as f:
+                    partition = f.read().splitlines()
+
+                df_partition = df_pred[df_pred['Test seqs'].isin(partition)]
+
+                y_true = df_partition['True labels'].to_numpy()
+                y_pred = df_partition['Predictions'].to_numpy()
+
+                if task == 'regression':
+                    metric = 'MAE'
+                else:
+                    metric = 'kappa'
+
+                perf = calculate_metric(y_true, y_pred, metric=metric,
+                            verbose=True)
+                results.append({'clf': checkpoint_file, 'partition': i,
+                    'perf': perf})
+
+            results_df = pd.DataFrame(results)
+            print(results_df)
+
+            print(f'=> Writing results to {f_name_results}')
+            if not os.path.exists(f_name_results):
+                results_df.to_csv(f_name_results)
+            else:
+                results_df.to_csv(f_name_results, mode='a', header=False)
+
         else:
-            metrics = ['accuracy', 'kappa', 'recall', 'precision', 'f1']
+            f_name_results = os.path.join(results_dir, f'results.json')
 
-        results = {'iters': args.K}
-        
-        for m in metrics:
-            results[m] = dict()
-            results[m]['iters'] = []
+            if task == 'classification':
+                f_name_confusion_matrix = os.path.join(results_dir, f'cm.pdf')
+                f_name_confusion_matrix_normalized = os.path.join(results_dir,
+                        f'cm_normalized.pdf')
 
-        for k in tqdm(range(args.K)):
-            y_true = df_pred['True labels'].to_numpy()
-            y_true = resample(y_true, random_state=k)
-            y_pred = df_pred['Predictions'].to_numpy()
-            y_pred = resample(y_pred, random_state=k)
+            # Open the dataframe containing all predicitons on the test set
+            df_pred = pd.read_csv(f_name_predictions, index_col=False)
+
+            print(f'=> K={args.K} bootstrapping rounds')
+
+            if task == 'regression':
+                metrics = ['MAE']
+            else:
+                metrics = ['accuracy', 'kappa', 'recall', 'precision', 'f1']
+
+            results = {'iters': args.K}
+            
+            for m in metrics:
+                results[m] = dict()
+                results[m]['iters'] = []
+
+            for k in tqdm(range(args.K)):
+                y_true = df_pred['True labels'].to_numpy()
+                y_true = resample(y_true, random_state=k)
+                y_pred = df_pred['Predictions'].to_numpy()
+                y_pred = resample(y_pred, random_state=k)
+
+                for m in metrics:
+                    results[m]['iters'].append(calculate_metric(y_true, y_pred,
+                        metric=m, verbose=False))
 
             for m in metrics:
-                results[m]['iters'].append(calculate_metric(y_true, y_pred,
-                    metric=m, verbose=False))
+                iters = results[m]['iters']
+                results[m]['mean'] = np.mean(iters)
+                results[m]['median'] = np.median(iters)
+                results[m]['std'] = np.std(iters)
+                results[m]['2.5 percentile'] = np.percentile(iters, 2.5)
+                results[m]['97.5 percentile'] = np.percentile(iters, 97.5)
+                del results[m]['iters']
 
-        for m in metrics:
-            iters = results[m]['iters']
-            results[m]['mean'] = np.mean(iters)
-            results[m]['median'] = np.median(iters)
-            results[m]['std'] = np.std(iters)
-            results[m]['2.5 percentile'] = np.percentile(iters, 2.5)
-            results[m]['97.5 percentile'] = np.percentile(iters, 97.5)
-            del results[m]['iters']
+            if task == 'classification':
+                # Create and plot confusion matrix
+                y_true = df_pred['True labels'].to_numpy()
+                y_pred = df_pred['Predictions'].to_numpy()
 
-        if task == 'classification':
-            # Create and plot confusion matrix
-            y_true = df_pred['True labels'].to_numpy()
-            y_pred = df_pred['Predictions'].to_numpy()
+                cm = calculate_confusion_matrix(y_true, y_pred)
+                cm_normalized = calculate_confusion_matrix(y_true, y_pred,
+                        normalize='pred')
+            
+                plot_confusion_matrix(cm, output_dimension,
+                        f_name_confusion_matrix)
+                plot_confusion_matrix(cm_normalized, output_dimension, 
+                        f_name_confusion_matrix_normalized)
 
-            cm = calculate_confusion_matrix(y_true, y_pred)
-            cm_normalized = calculate_confusion_matrix(y_true, y_pred,
-                    normalize='pred')
-        
-            plot_confusion_matrix(cm, output_dimension,
-                    f_name_confusion_matrix)
-            plot_confusion_matrix(cm_normalized, output_dimension, 
-                    f_name_confusion_matrix_normalized)
+                results['confusion matrix'] = cm.tolist()
+                results['confusion matrix normalized'] = cm_normalized.tolist()
 
-            results['confusion matrix'] = cm.tolist()
-            results['confusion matrix normalized'] = cm_normalized.tolist()
-
-        print(f'=> Writing results to {f_name_results}')
-        with open(f_name_results, 'w') as f:
-            json.dump(results, f)
+            print(f'=> Writing results to {f_name_results}')
+            with open(f_name_results, 'w') as f:
+                json.dump(results, f)
 
 
 if __name__ == '__main__':

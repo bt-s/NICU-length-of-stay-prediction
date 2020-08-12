@@ -138,7 +138,9 @@ def get_baseline_datasets(subject_dirs, coarse_targets=False, pre_imputed=False,
     else:
         X = None
 
-    y, t = np.zeros(tot_num_sub_seqs), np.zeros(tot_num_sub_seqs)
+    y = np.zeros(tot_num_sub_seqs) 
+    t = np.zeros(tot_num_sub_seqs)
+    s = [''] * tot_num_sub_seqs
 
     if coarse_targets:
         target_str = 'coarse'
@@ -165,13 +167,14 @@ def get_baseline_datasets(subject_dirs, coarse_targets=False, pre_imputed=False,
 
         y[cnt_old:cnt] = yy
         t[cnt_old:cnt] = tt
+        s[cnt_old:cnt] = [sd] * (cnt-cnt_old)
 
     if not targets_only:
-        X, y, t = shuffle(X, y, t)
-        return X, y, t
+        X, y, t, s = shuffle(X, y, t, s)
+        return X, y, t, s
     else:
-        y, t = shuffle(y, t)
-        return y, t
+        y, t, s = shuffle(y, t, s)
+        return y, t, s
 
 
 def get_optimal_bucket_boundaries(n=100):
@@ -206,4 +209,23 @@ def get_optimal_bucket_boundaries(n=100):
         bucket_boundaries.append(rows[len(rows)//100*i])
 
     return bucket_boundaries
+
+
+def partition_test_set(n_partitions):
+    def partition_list(l):
+        return np.array_split(l, n_partitions)
+
+    with open('test_list.txt', 'r') as f:
+       data = f.read().splitlines() 
+       subjects = list(set([d.split(',')[0] for d in data]))
+
+    subject_partitions = partition_list(subjects)
+    for i, subject_partition in enumerate(subject_partitions):
+        data_partition = [d for s in subject_partition for d in data \
+                if s+',' in d]
+
+        with open(f'test_partitions/test_part{i}.txt', 'w') as f:
+            print(f'Writing partition {i+1}/{n_partitions} of length ' \
+                    f'{len(data_partition)} to file.')
+            f.write('\n'.join(data_partition))
 
