@@ -2,7 +2,7 @@
 Master Thesis: Predicting the Length of Stay of Newborns in the Neonatal Intensive Care Unit
 
 ### Link to paper
-- To be provided.
+- http://kth.diva-portal.org/smash/record.jsf?pid=diva2%3A1472280&dswid=-5812
 
 ### Abstract
 
